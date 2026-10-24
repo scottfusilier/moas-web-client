@@ -24,3 +24,5 @@ endfunction()
 
 moas_fuzz(frame LIBS moas_oasp)
 moas_fuzz(message LIBS moas_oasp)
+moas_fuzz(n1mm_xml LIBS moas_freq)
+moas_fuzz(rigctld_reply LIBS moas_freq)

@@ -7,4 +7,5 @@
 add_subdirectory(platform)
 add_subdirectory(core)
 add_subdirectory(oasp)
+add_subdirectory(freq)
 add_subdirectory(app)

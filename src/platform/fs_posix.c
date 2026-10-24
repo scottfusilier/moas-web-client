@@ -40,7 +40,7 @@ from_errno(int e)
 int
 plat_read_file(const char *path, size_t max, char **data, size_t *len)
 {
-    int fd;
+    int fd = -1;
 
     /* The buffer is max + 2 bytes; keep that from wrapping around. */
     if (max > SIZE_MAX - 2) {
@@ -167,7 +167,7 @@ plat_replace_file(const char *path, const void *data, size_t len)
         mode = st.st_mode & 07777;
     }
 
-    int fd;
+    int fd = -1;
     do {
         fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, mode);
     } while (fd == -1 && errno == EINTR);

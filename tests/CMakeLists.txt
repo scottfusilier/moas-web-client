@@ -33,6 +33,11 @@ moas_test(frame LIBS moas_oasp)
 moas_test(message LIBS moas_oasp)
 moas_test(client LIBS moas_oasp SOURCES fake_moas_server.c)
 
+# Frequency sources.
+moas_test(tracker LIBS moas_freq)
+moas_test(n1mm LIBS moas_freq)
+moas_test(rigctld LIBS moas_freq)
+
 # moasweb.
 moas_test(args LIBS moas_app)
 moas_test(watch LIBS moas_app SOURCES fake_moas_server.c)

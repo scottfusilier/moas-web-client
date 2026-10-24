@@ -46,7 +46,7 @@ struct plat_addr {
 };
 
 /* Longest text plat_addr_format() writes, including the terminating NUL. */
-#define PLAT_ADDR_TEXT_MAX 64
+#define PLAT_ADDR_TEXT_MAX 80
 
 /*
  * Parses "host:port".  host is an IPv4 address ("127.0.0.1"), an IPv6

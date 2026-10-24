@@ -31,3 +31,9 @@ numbers follow [Semantic Versioning](https://semver.org/).
   and console use UTF-8.
 * Fuzz targets for the framer and the decoder, the `fuzz` preset and
   `scripts/fuzz.sh`; their corpus also runs as tests everywhere.
+* Frequency sources (`src/freq/`): a tracker per radio with the Go
+  version's priority and failover rules; the `n1mm` type (shared UDP
+  listeners, a strict RadioInfo reader, the radios heard) and the `rigctld`
+  type (polling, and a one-off Test); a registry so that a new type is one
+  file and one line.  Fuzz targets for both readers, and
+  `docs/adding-a-frequency-source.md`.

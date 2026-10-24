@@ -321,6 +321,26 @@ As built, Stage 2 differs from the plan, or adds to it, in these ways:
 * `docs/adding-a-frequency-source.md`, using rigctld as the example.
 * Tests ported from the Go `freq` tests, on loopback sockets.
 
+As built, Stage 3 differs from the plan, or adds to it, in these ways:
+
+* Each source type reads its own settings straight from the JSON of its
+  entry in a radio's `"Sources"`, so a new type can have settings of its
+  own without changing any shared struct.  Unknown settings are refused,
+  and the error messages follow the Go version's ("PollMilliseconds does
+  not apply to n1mm").  Addresses must be numeric, as everywhere else.
+* The manual override (a typed frequency holds until the radio is tuned)
+  stays in the app, as in the Go version, where it is part of passing
+  frequencies to the server; it comes with Stage 5.  The tracker itself
+  follows the Go `freq.Tracker` exactly.
+* The tracker checks for stale readings itself, four times a second, on
+  the event loop; tests replace its clock.
+* N1MM's "radios heard" list and rigctld's one-off Test, both for the
+  settings page, are here already.
+* N1MM station names longer than CAPS_N1MM_STATION are cut short, and
+  readings must be between 1 kHz and 1 THz.
+* Not yet tried against a real N1MM or rigctld: nothing in moasweb uses
+  the sources until Stage 5 wires them up.
+
 ## Stage 4: HTTP server
 
 * Request parsing through picohttpparser, with our own checks on top:

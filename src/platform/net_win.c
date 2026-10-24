@@ -135,7 +135,7 @@ open_socket(const struct plat_addr *addr, int type, SOCKET *out)
 int
 plat_tcp_connect(const struct plat_addr *addr, plat_socket *out)
 {
-    SOCKET s;
+    SOCKET s = INVALID_SOCKET;
     int err = open_socket(addr, SOCK_STREAM, &s);
     if (err != 0) {
         return err;
@@ -154,7 +154,7 @@ plat_tcp_connect(const struct plat_addr *addr, plat_socket *out)
 int
 plat_tcp_listen(const struct plat_addr *addr, plat_socket *out)
 {
-    SOCKET s;
+    SOCKET s = INVALID_SOCKET;
     int err = open_socket(addr, SOCK_STREAM, &s);
     if (err != 0) {
         return err;
@@ -218,7 +218,7 @@ plat_tcp_accept(plat_socket listener, plat_socket *out, struct plat_addr *peer)
 static int
 open_udp(const struct plat_addr *addr, SOCKET *out)
 {
-    SOCKET s;
+    SOCKET s = INVALID_SOCKET;
     int err = open_socket(addr, SOCK_DGRAM, &s);
     if (err != 0) {
         return err;
@@ -239,7 +239,7 @@ open_udp(const struct plat_addr *addr, SOCKET *out)
 int
 plat_udp_bind(const struct plat_addr *addr, plat_socket *out)
 {
-    SOCKET s;
+    SOCKET s = INVALID_SOCKET;
     int err = open_udp(addr, &s);
     if (err != 0) {
         return err;
@@ -256,7 +256,7 @@ plat_udp_bind(const struct plat_addr *addr, plat_socket *out)
 int
 plat_udp_open(const struct plat_addr *like, plat_socket *out)
 {
-    SOCKET s;
+    SOCKET s = INVALID_SOCKET;
     int err = open_udp(like, &s);
     if (err != 0) {
         return err;

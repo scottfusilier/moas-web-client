@@ -43,6 +43,16 @@ errors; a plain `cmake -S . -B build` does not, unless you add
 formatting.  A change is done when the check passes on Windows, FreeBSD and
 Linux.
 
+On Windows, if MSYS2's gcc is also installed (`pacman -S
+mingw-w64-ucrt-x86_64-gcc`), `check.bat` also builds an optimised gcc build
+with warnings as errors and `_FORTIFY_SOURCE`, and runs the tests on it:
+gcc warns about things clang does not, especially in optimised code.
+
+To try gcc on FreeBSD, `pkg install gcc14` and run the check with
+`CC=gcc14` (after `rm -rf build`).  gcc's sanitizers will not start on
+FreeBSD with address randomisation on; run the `asan` tests with
+`proccontrol -m aslr -s disable ctest --preset asan`.
+
 ### Fuzzing
 
 Every parser of outside input has a fuzz target in `fuzz/`.  On FreeBSD and

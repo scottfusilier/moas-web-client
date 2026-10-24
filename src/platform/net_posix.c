@@ -135,7 +135,7 @@ sockaddr_of(const struct plat_addr *addr)
 int
 plat_tcp_connect(const struct plat_addr *addr, plat_socket *out)
 {
-    int fd;
+    int fd = -1;
     int err = open_socket(addr, SOCK_STREAM, &fd);
     if (err != 0) {
         return err;
@@ -155,7 +155,7 @@ plat_tcp_connect(const struct plat_addr *addr, plat_socket *out)
 int
 plat_tcp_listen(const struct plat_addr *addr, plat_socket *out)
 {
-    int fd;
+    int fd = -1;
     int err = open_socket(addr, SOCK_STREAM, &fd);
     if (err != 0) {
         return err;
@@ -180,7 +180,7 @@ plat_tcp_accept(plat_socket listener, plat_socket *out, struct plat_addr *peer)
     socklen_t len = (socklen_t)sizeof(from.u.bytes);
 
     memset(&from, 0, sizeof(from));
-    int fd;
+    int fd = -1;
     do {
         fd = accept(listener, (struct sockaddr *)(void *)from.u.bytes, &len);
     } while (fd == -1 && errno == EINTR);
@@ -207,7 +207,7 @@ plat_tcp_accept(plat_socket listener, plat_socket *out, struct plat_addr *peer)
 int
 plat_udp_bind(const struct plat_addr *addr, plat_socket *out)
 {
-    int fd;
+    int fd = -1;
     int err = open_socket(addr, SOCK_DGRAM, &fd);
     if (err != 0) {
         return err;

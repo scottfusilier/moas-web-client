@@ -54,4 +54,25 @@
 /* Most descriptions of one antenna (there is usually one). */
 #define CAPS_OASP_DESCRIPTIONS 4
 
+/* Most frequency sources for one radio. */
+#define CAPS_FREQ_SOURCES 8
+
+/* Longest source name, such as "N1MM RUN-PC radio 1", including the NUL. */
+#define CAPS_FREQ_NAME 96
+
+/* Longest description of why a source failed, including the NUL. */
+#define CAPS_FREQ_ERROR 160
+
+/* Largest UDP packet read from N1MM, in bytes; larger ones are ignored. */
+#define CAPS_N1MM_PACKET (16 * 1024)
+
+/* Longest N1MM station name, in bytes of UTF-8, including the NUL. */
+#define CAPS_N1MM_STATION 64
+
+/* Most radios remembered as heard on one N1MM address. */
+#define CAPS_N1MM_HEARD 32
+
+/* Longest reply line read from rigctld, in bytes. */
+#define CAPS_RIGCTLD_LINE 256
+
 #endif /* MOAS_CORE_CAPS_H */

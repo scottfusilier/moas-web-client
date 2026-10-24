@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RadioInfo>
+	<app>N1MM</app>
+	<StationName>RUN-PC</StationName>
+	<RadioNr>1</RadioNr>
+	<Freq>1402550</Freq>
+	<TXFreq>1402550</TXFreq>
+	<Mode>CW</Mode>
+	<Rotors></Rotors>
+	<IsConnected>True</IsConnected>
+</RadioInfo>
