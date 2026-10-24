@@ -89,6 +89,9 @@ guide for the C code of Python:
 
 * Declare variables where they are first used.
 * `/* */` comments.
+* In printf-style formats, no `%zu`, `%jd` or `%td`: gcc on Windows checks
+  formats against Microsoft's rules, which lack them.  Cast to `unsigned
+  long long` or `long long` and use `%llu` or `%lld`.
 
 Naming is not PEP 7's (that part is specific to Python):
 

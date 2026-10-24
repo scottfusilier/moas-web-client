@@ -38,6 +38,10 @@ moas_test(tracker LIBS moas_freq)
 moas_test(n1mm LIBS moas_freq)
 moas_test(rigctld LIBS moas_freq)
 
+# The HTTP server.
+moas_test(http_parse LIBS moas_http)
+moas_test(http_server LIBS moas_http)
+
 # moasweb.
 moas_test(args LIBS moas_app)
 moas_test(watch LIBS moas_app SOURCES fake_moas_server.c)

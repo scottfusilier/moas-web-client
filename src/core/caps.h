@@ -75,4 +75,31 @@
 /* Longest reply line read from rigctld, in bytes. */
 #define CAPS_RIGCTLD_LINE 256
 
+/* Browser connections served at once; more are closed at once. */
+#define CAPS_HTTP_CONNECTIONS 32
+
+/* Largest request line and headers, in bytes. */
+#define CAPS_HTTP_HEAD (8 * 1024)
+
+/* Most headers in one request. */
+#define CAPS_HTTP_HEADERS 32
+
+/* Longest request target (path and query), in bytes. */
+#define CAPS_HTTP_TARGET 1024
+
+/* Largest request body any route may accept (each route sets its own). */
+#define CAPS_HTTP_BODY (64 * 1024)
+
+/* Most bytes waiting to be sent to one browser; a slower one is dropped. */
+#define CAPS_HTTP_SEND (1024 * 1024)
+
+/* Live-update streams open at once. */
+#define CAPS_HTTP_STREAMS 16
+
+/* Routes one router holds. */
+#define CAPS_HTTP_ROUTES 32
+
+/* Extra headers one response may carry. */
+#define CAPS_HTTP_EXTRA_HEADERS 8
+
 #endif /* MOAS_CORE_CAPS_H */

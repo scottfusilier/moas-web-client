@@ -1,0 +1,7 @@
+POST /api/select HTTP/1.1
+Host: localhost:8080
+Origin: http://localhost:8080
+Content-Type: application/json
+Content-Length: 42
+
+{"station":1,"radio":1,"antenna":10,"tx":true}

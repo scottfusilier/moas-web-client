@@ -37,3 +37,10 @@ numbers follow [Semantic Versioning](https://semver.org/).
   type (polling, and a one-off Test); a registry so that a new type is one
   file and one line.  Fuzz targets for both readers, and
   `docs/adding-a-frequency-source.md`.
+* The HTTP server (`src/http/`): strict request reading on top of
+  picohttpparser (fuzzed), routes with per-route body limits, the Go
+  version's Host, Origin, Content-Type and local-only checks, protective
+  response headers, replies that can be sent later with cancellation,
+  server-sent event streams, and limits on connections, sizes and time.
+* `scripts\check.bat` always uses MSYS2's clang, and adds a gcc pass when
+  MSYS2's gcc is installed.

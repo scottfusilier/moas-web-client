@@ -1,0 +1,6 @@
+GET /events HTTP/1.0
+Connection: Keep-Alive
+
+GET / HTTP/1.1
+Host: [::1]:8080
+

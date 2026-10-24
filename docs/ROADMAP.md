@@ -108,13 +108,12 @@ moas-web-client/
 │   │   ├── n1mm.c, n1mm_xml.c     UDP listener; RadioInfo reader (fuzzed)
 │   │   └── rigctld.c, rigctld_reply.c   poller and Test; reply parser (fuzzed)
 │   ├── http/                      prefix http_
-│   │   ├── server.h, server.c     connections, buffers, limits, time limits
-│   │   ├── request.h              parsed request as slices, loopback flag
-│   │   ├── parse.c                picohttpparser plus our checks (fuzzed)
-│   │   ├── response.c             responses with security headers
-│   │   ├── router.h, router.c     method + path to handler; LOCAL_ONLY flag
-│   │   ├── guard.c                Host and Origin checks
-│   │   └── sse.h, sse.c           server-sent events
+│   │   ├── http.h                 the interface: routes, replies, streams, server
+│   │   ├── parse.h, parse.c       request heads: picohttpparser plus our checks (fuzzed)
+│   │   ├── router.c, internal.h   method + path to handler; per-route body limit, local only
+│   │   ├── guard.c                Host, Origin, Content-Type and local-only checks
+│   │   └── server.c               connections, responses with security headers,
+│   │                              replies sent later, server-sent events, limits
 │   └── app/                       prefix app_; moasweb
 │       ├── main.c                 startup order and clean shutdown
 │       ├── args.h, args.c         command line; -config and --config
@@ -352,6 +351,32 @@ As built, Stage 3 differs from the plan, or adds to it, in these ways:
   only from the local computer.
 * Tests: parser edge cases and end-to-end requests over loopback.
 
+As built, Stage 4 differs from the plan, or adds to it, in these ways:
+
+* Responses and streams live in `server.c` with the connections, rather
+  than in files of their own; `http.h` is the one header the app uses.
+* A handler can answer later (the settings page's rigctld Test waits for
+  rigctld).  If the browser goes first, the handler's cancel callback runs,
+  so it can stop what it started.  Cancel callbacks, like handlers, only run
+  from the event loop, never inside a call the app makes.
+* The guard follows the Go version: when the page is served on a loopback
+  address only, the `Host` must be a loopback name (against DNS
+  rebinding); a POST must come from the page's own origin, if the browser
+  says, and be `application/json`; local-only routes refuse other
+  computers.
+* Every response says `Cache-Control: no-store`, `X-Content-Type-Options:
+  nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`, and
+  carries a strict `Content-Security-Policy` unless the handler gives its
+  own (the page will, in Stage 5).
+* Refused outright: chunked request bodies (`Transfer-Encoding`), more than
+  one `Content-Length` or `Host`, targets that are not plain paths, folded
+  header lines, control characters in headers, and HTTP versions other than
+  1.0 and 1.1.
+* Limits: 10 s to send a request's head and body, 30 s idle between
+  requests, 30 s without progress while sending, 32 connections, 16
+  live-update streams, and 1 MiB waiting for any one browser before it is
+  dropped.
+
 ## Stage 5: moasweb
 
 * Settings: the Go version's JSON format, `"Version"` and `"_comment"`
@@ -384,10 +409,13 @@ This Windows PC (MSYS2 CLANG64 toolchain), the maintainer's FreeBSD
 machines, which also run fuzzing and the sanitizers, and a Linux virtual
 machine (Debian 13).
 
-**Deferred:** Stages 0 to 2 passed the check on Windows and FreeBSD, and
+**Deferred:** Stages 0 to 3 passed the check on Windows and FreeBSD, and
 fuzzing on FreeBSD, but have not yet been checked on Linux (maintainer's
-decision, 2026-10-24, to keep going while the Debian VM is set up).  Run
-`scripts/check.sh` on Linux before Stage 4 starts, and fix anything it
-finds then.  The maintainer keeps
-the git repository locally and decides later where, if anywhere, it is
-published.
+decisions, 2026-10-24, to keep going while the Debian VM is set up).  gcc
+builds on Windows (part of `check.bat`) and on FreeBSD cover gcc's
+warnings in the meantime.  What only Linux checks is memory leaks:
+LeakSanitizer runs by default only there.  Run `scripts/check.sh` on Linux
+before Stage 5 starts, and fix anything it finds then.
+
+The maintainer keeps the git repository locally and decides later where, if
+anywhere, it is published.
