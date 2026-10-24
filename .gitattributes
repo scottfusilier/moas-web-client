@@ -1,0 +1,11 @@
+# Text files are stored and checked out with LF line endings on every system,
+# except Windows batch files, which need CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.ico binary
+
+# Fuzz inputs are exact bytes, line endings included.
+fuzz/corpus/** -text

@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2026 Scott Fusilier
+#
+# Editor settings; see https://editorconfig.org.  4-space indents and no tabs
+# everywhere.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+max_line_length = 79
+
+[*.{bat,cmd}]
+end_of_line = crlf
+
+[*.md]
+max_line_length = off
+
+# Third-party code is kept exactly as it comes from upstream.
+[third_party/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset
+max_line_length = unset
+
+# Fuzz inputs are exact bytes.
+[fuzz/corpus/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset
+max_line_length = unset

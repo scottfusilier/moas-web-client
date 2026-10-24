@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2026 Scott Fusilier
+#
+# PEP 7 layout: 4-space indents, no tabs, 79 columns, braces always, the
+# return type of a function definition on its own line and its opening brace
+# on the next.  See CONTRIBUTING.md.  Reference: clang-format 23.
+---
+Language: Cpp
+BasedOnStyle: LLVM
+IndentWidth: 4
+ContinuationIndentWidth: 4
+UseTab: Never
+ColumnLimit: 79
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  # A control statement whose condition runs over several lines gets its
+  # brace on a line of its own, as PEP 7 shows.
+  AfterControlStatement: MultiLine
+  AfterEnum: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeElse: false
+  BeforeWhile: false
+BreakAfterReturnType: TopLevelDefinitions
+InsertBraces: true
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+IndentCaseLabels: false
+PointerAlignment: Right
+AlignAfterOpenBracket: Align
+BreakBeforeBinaryOperators: None
+MaxEmptyLinesToKeep: 1
+SortIncludes: Never
+IncludeBlocks: Preserve
+PenaltyBreakAssignment: 100

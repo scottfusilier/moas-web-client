@@ -1,0 +1,61 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "MOAS_WERROR": "ON"
+            }
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug",
+            "inherits": "base",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+        },
+        {
+            "name": "release",
+            "displayName": "Release",
+            "inherits": "base",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+        },
+        {
+            "name": "asan",
+            "displayName": "Debug with AddressSanitizer and UndefinedBehaviorSanitizer",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "MOAS_SANITIZE": "ON"
+            }
+        },
+        {
+            "name": "fuzz",
+            "displayName": "Fuzz targets with libFuzzer (clang only)",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "MOAS_FUZZ": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "debug", "configurePreset": "debug" },
+        { "name": "release", "configurePreset": "release" },
+        { "name": "asan", "configurePreset": "asan" },
+        { "name": "fuzz", "configurePreset": "fuzz" }
+    ],
+    "testPresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "output": { "outputOnFailure": true }
+        },
+        { "name": "debug", "inherits": "base", "configurePreset": "debug" },
+        { "name": "release", "inherits": "base", "configurePreset": "release" },
+        { "name": "asan", "inherits": "base", "configurePreset": "asan" }
+    ]
+}

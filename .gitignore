@@ -1,0 +1,12 @@
+# Build output
+/build/
+/out/
+
+# Editor and tool files
+/.cache/
+*.swp
+*~
+.DS_Store
+
+# A local settings file used while testing
+moasweb.json
