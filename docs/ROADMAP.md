@@ -427,7 +427,7 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
   on a port other than 12059, so that a real server on this computer is
   never reached by mistake.
 
-## Stage 6: DXLog, trial, packaging, 1.0
+## Stage 6: DXLog, every configuration, trial, packaging, 1.0
 
 * DXLog as a frequency source.  DXLog.net, like N1MM Logger+, reports each
   radio's frequency over UDP.  First find out exactly what it sends, from
@@ -447,10 +447,39 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
     shows each source only its own logger's radios heard.
   * Since DXLog sends no `IsConnected`, a radio set up in DXLog with no
     rig behind it keeps reporting the frequency last shown for it.
-  * Still to try by hand: a live DXLog with a radio connected, tuning
-    across bands.
+  * Tried by hand: a live DXLog with radio 1 connected, tuning across
+    bands, through moas-web-client to a `--sim` server; the buttons
+    followed each band change.
+* Every MOAS configuration, not only the ones tried so far.  Antenna
+  selection must work whatever a server's configuration uses, so the
+  client handles the whole of the protocol for it (rotators excepted, see
+  Later):
+  * Text from the server: shown on the page and in the program's output.
+    One action asks the client to stop, as when a server that allows only
+    one client refuses another; then say so, and retry only slowly
+    rather than reconnecting every few seconds.
+  * On/off functions: a function that is not momentary is turned off by
+    sending "deselect" when it is on, and one marked `Alternate` is
+    toggled with "alternate".  Today every press sends "select", which is
+    right only for momentary functions.
+  * Additive antenna systems: antennas marked `Additive` in a
+    Configuration are added to and removed from the selection ("additive
+    select" and "additive deselect") rather than replacing it.
+  * Relative antennas: next and previous antenna in the band's relative
+    list, as page buttons; and, behind a setting, following a logger's
+    antenna changes (N1MM's and DXLog's antenna number) the same way.
+  * Switch not reachable: TR 0 shown as "unavailable", not blank.
+  * RX the same as TX, as an antenna change.
+  * Logger messages both ways: a logger's F-key text sent for a radio,
+    and shown when the server passes one on from another client.
+  * Not needed: asking the server for its list of layouts, and the
+    callsign, direction and distance a Radio message may carry; nothing
+    in a MOAS configuration depends on them.
+  * Each with tests against the fake MOAS server, and a fake server
+    configuration that uses it.
 * Try every feature from a checklist against a `--sim` server and the real
-  switch, DXLog included.
+  switch, DXLog included, with configurations that use additive systems,
+  on/off functions and relative antennas.
 * CPack packages (`.zip` for Windows, `.tar.gz` elsewhere), with checksums.
 * Build and test on macOS, and with MSVC, before 1.0.
 * User guide, `docs/architecture.md` and protocol notes.
