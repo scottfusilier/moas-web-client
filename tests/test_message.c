@@ -262,10 +262,15 @@ test_encode(void)
 
     buf_clear(&b);
     CHECK_INT_EQ(oasp_encode_radio(&b, 2, radio, 14000), 0);
-    CHECK_INT_EQ(oasp_encode_antenna(&b, 3, radio, 20, true, true), 0);
+    CHECK_INT_EQ(oasp_encode_antenna(&b, 3, radio, 20, OASP_CHANGE_SYSTEM,
+                                     OASP_CHANGE_SYSTEM),
+                 0);
     /* Antenna ID 0 is valid and must still be sent. */
-    CHECK_INT_EQ(oasp_encode_antenna(&b, 4, radio, 0, false, true), 0);
-    CHECK_INT_EQ(oasp_encode_function(&b, 5, radio, 1), 0);
+    CHECK_INT_EQ(oasp_encode_antenna(&b, 4, radio, 0, OASP_CHANGE_NONE,
+                                     OASP_CHANGE_SYSTEM),
+                 0);
+    CHECK_INT_EQ(oasp_encode_function(&b, 5, radio, 1, OASP_FUNCTION_SELECT),
+                 0);
     CHECK_MEM_EQ(
         b.data, b.len,
         "{\"Message\":\"Radio\",\"Sequence\":2,\"Version\":1,\"Parameters\":"
@@ -281,7 +286,8 @@ test_encode(void)
 
     /* Neither TX nor RX: nothing is written. */
     size_t len = b.len;
-    CHECK_INT_EQ(oasp_encode_antenna(&b, 6, radio, 20, false, false),
+    CHECK_INT_EQ(oasp_encode_antenna(&b, 6, radio, 20, OASP_CHANGE_NONE,
+                                     OASP_CHANGE_NONE),
                  ERR_INVALID);
     CHECK_INT_EQ(b.len, len);
 
@@ -290,6 +296,126 @@ test_encode(void)
     crowded.radio_count = CAPS_OASP_RADIOS + 1;
     CHECK_INT_EQ(oasp_encode_hello(&b, 1, &crowded), ERR_INVALID);
     buf_fini(&b);
+}
+
+/* Every kind of antenna change, function change, and Logger. */
+static void
+test_encode_changes(void)
+{
+    struct buf b;
+    const struct oasp_radio_id radio = {.station = 1, .radio = 2};
+
+    buf_init(&b, 4096);
+    CHECK_INT_EQ(oasp_encode_antenna(&b, 2, radio, 50, OASP_CHANGE_ADD,
+                                     OASP_CHANGE_REMOVE),
+                 0);
+    CHECK_INT_EQ(oasp_encode_antenna(&b, 3, radio, 0, OASP_CHANGE_NEXT,
+                                     OASP_CHANGE_PREVIOUS),
+                 0);
+    CHECK_INT_EQ(oasp_encode_antenna(&b, 4, radio, 12, OASP_CHANGE_ALL,
+                                     OASP_CHANGE_SAME_AS_TX),
+                 0);
+    CHECK_INT_EQ(oasp_encode_function(&b, 5, radio, 3, OASP_FUNCTION_DESELECT),
+                 0);
+    CHECK_INT_EQ(
+        oasp_encode_function(&b, 6, radio, 4, OASP_FUNCTION_ALTERNATE), 0);
+    CHECK_INT_EQ(oasp_encode_logger(&b, 7, radio, "CQ TEST K1ABC"), 0);
+    CHECK_INT_EQ(oasp_encode_logger(&b, 8, radio, ""), 0);
+    CHECK_MEM_EQ(
+        b.data, b.len,
+        "{\"Message\":\"Antenna\",\"Sequence\":2,\"Version\":1,\"Parameters\":"
+        "{\"Station\":1,\"Radio\":2,\"Antennas\":[{\"TX\":3,\"Antenna\":50},"
+        "{\"RX\":4,\"Antenna\":50}]}}"
+        "{\"Message\":\"Antenna\",\"Sequence\":3,\"Version\":1,\"Parameters\":"
+        "{\"Station\":1,\"Radio\":2,\"Antennas\":[{\"TX\":6,\"Antenna\":0},"
+        "{\"RX\":7,\"Antenna\":0}]}}"
+        "{\"Message\":\"Antenna\",\"Sequence\":4,\"Version\":1,\"Parameters\":"
+        "{\"Station\":1,\"Radio\":2,\"Antennas\":[{\"TX\":2,\"Antenna\":12},"
+        "{\"RX\":99,\"Antenna\":12}]}}"
+        "{\"Message\":\"Function\",\"Sequence\":5,\"Version\":1,"
+        "\"Parameters\":{\"Station\":1,\"Radio\":2,\"Function\":3,"
+        "\"State\":2}}"
+        "{\"Message\":\"Function\",\"Sequence\":6,\"Version\":1,"
+        "\"Parameters\":{\"Station\":1,\"Radio\":2,\"Function\":4,"
+        "\"State\":3}}"
+        "{\"Message\":\"Logger\",\"Sequence\":7,\"Version\":1,"
+        "\"Parameters\":{\"Station\":1,\"Radio\":2,\"Message\":"
+        "\"CQ TEST K1ABC\"}}"
+        "{\"Message\":\"Logger\",\"Sequence\":8,\"Version\":1,"
+        "\"Parameters\":{\"Station\":1,\"Radio\":2,\"Message\":\"\"}}");
+
+    /* Refused, writing nothing. */
+    size_t len = b.len;
+    CHECK_INT_EQ(oasp_encode_antenna(&b, 9, radio, 12, 8, OASP_CHANGE_NONE),
+                 ERR_INVALID);
+    CHECK_INT_EQ(oasp_encode_antenna(&b, 9, radio, 12, -1, OASP_CHANGE_NONE),
+                 ERR_INVALID);
+    CHECK_INT_EQ(oasp_encode_antenna(&b, 9, radio, 12, OASP_CHANGE_SAME_AS_TX,
+                                     OASP_CHANGE_NONE),
+                 ERR_INVALID); /* same as TX makes no sense for TX */
+    CHECK_INT_EQ(oasp_encode_function(&b, 9, radio, 1, 0), ERR_INVALID);
+    CHECK_INT_EQ(oasp_encode_function(&b, 9, radio, 1, 4), ERR_INVALID);
+    CHECK_INT_EQ(oasp_encode_logger(&b, 9, radio, "tab\there"), ERR_INVALID);
+    CHECK_INT_EQ(oasp_encode_logger(&b, 9, radio, "caf\xc3\xa9"), ERR_INVALID);
+    CHECK_INT_EQ(oasp_encode_logger(&b, 9, radio, NULL), ERR_INVALID);
+    char long_text[CAPS_OASP_NOTICE + 1];
+    memset(long_text, 'A', sizeof(long_text) - 1);
+    long_text[CAPS_OASP_NOTICE] = '\0';
+    CHECK_INT_EQ(oasp_encode_logger(&b, 9, radio, long_text), ERR_INVALID);
+    long_text[CAPS_OASP_NOTICE - 1] = '\0'; /* just fits */
+    CHECK_INT_EQ(b.len, len);
+    CHECK_INT_EQ(oasp_encode_logger(&b, 9, radio, long_text), 0);
+    buf_fini(&b);
+}
+
+/* Text, Logger, an additive antenna, and a TR the switch cannot give. */
+static void
+test_decode_notices(void)
+{
+    struct oasp_message m;
+
+    CHECK_INT_EQ(oasp_decode(STR_LIT("{\"Message\":\"Text\",\"Sequence\":1,"
+                                     "\"Version\":1,\"Parameters\":{"
+                                     "\"Action\":1,\"Text\":\"Another client "
+                                     "is already connected\"}}"),
+                             &m),
+                 0);
+    CHECK_INT_EQ(m.kind, OASP_TEXT);
+    CHECK_INT_EQ(m.u.text.action, OASP_TEXT_EXIT);
+    CHECK_TEXT(m.u.text.text, "Another client is already connected");
+    oasp_message_free(&m);
+
+    CHECK_INT_EQ(oasp_decode(STR_LIT("{\"Message\":\"Logger\",\"Sequence\":2,"
+                                     "\"Version\":1,\"Parameters\":{"
+                                     "\"Station\":1,\"Radio\":2,\"Message\":"
+                                     "\"CQ \\u001b[2J\"}}"),
+                             &m),
+                 0);
+    CHECK_INT_EQ(m.kind, OASP_LOGGER);
+    CHECK_INT_EQ(m.u.logger.radio, 2);
+    CHECK_TEXT(m.u.logger.message, "CQ ?[2J"); /* cleaned */
+    oasp_message_free(&m);
+
+    CHECK_INT_EQ(oasp_decode(STR_LIT("{\"Message\":\"Configuration\","
+                                     "\"Sequence\":3,\"Version\":1,"
+                                     "\"Parameters\":{\"Station\":1,\"Radio\":"
+                                     "1,\"Antennas\":[{\"Antenna\":50,"
+                                     "\"Additive\":true},{\"Antenna\":51}]}}"),
+                             &m),
+                 0);
+    CHECK(m.u.configuration.antenna_count == 2 &&
+          m.u.configuration.antennas[0].additive &&
+          !m.u.configuration.antennas[1].additive);
+    oasp_message_free(&m);
+
+    CHECK_INT_EQ(oasp_decode(STR_LIT("{\"Message\":\"TR\",\"Sequence\":4,"
+                                     "\"Version\":1,\"Parameters\":{"
+                                     "\"Station\":1,\"Radio\":1,\"TR\":0}}"),
+                             &m),
+                 0);
+    CHECK_INT_EQ(m.u.tr.tr, OASP_TR_UNAVAILABLE);
+    CHECK_TEXT(oasp_tr_name(m.u.tr.tr), "unavailable");
+    oasp_message_free(&m);
 }
 
 int
@@ -303,5 +429,7 @@ main(void)
     RUN(test_limits_and_cleaning);
     RUN(test_take);
     RUN(test_encode);
+    RUN(test_encode_changes);
+    RUN(test_decode_notices);
     return test_summary();
 }

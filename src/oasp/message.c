@@ -33,6 +33,8 @@ const char *
 oasp_tr_name(int tr)
 {
     switch (tr) {
+    case OASP_TR_UNAVAILABLE:
+        return "unavailable";
     case OASP_TR_INHIBITED:
         return "inhibited";
     case OASP_TR_RECEIVE:
@@ -122,6 +124,7 @@ decode_antenna_button(const cJSON *p, struct oasp_antenna_button *out)
     TRY(json_get_text(p, "ShortName", out->short_name,
                       sizeof(out->short_name)));
     TRY(json_get_text(p, "LongName", out->long_name, sizeof(out->long_name)));
+    TRY(json_get_bool(p, "Additive", &out->additive));
     TRY(get_int(p, "Row", &out->row));
     TRY(get_int(p, "Column", &out->column));
 
@@ -261,6 +264,23 @@ decode_tr(const cJSON *p, struct oasp_tr *out)
 }
 
 static int
+decode_text(const cJSON *p, struct oasp_text *out)
+{
+    TRY(get_int(p, "Action", &out->action));
+    TRY(json_get_text(p, "Text", out->text, sizeof(out->text)));
+    return 0;
+}
+
+static int
+decode_logger(const cJSON *p, struct oasp_logger *out)
+{
+    TRY(get_int(p, "Station", &out->station));
+    TRY(get_int(p, "Radio", &out->radio));
+    TRY(json_get_text(p, "Message", out->message, sizeof(out->message)));
+    return 0;
+}
+
+static int
 decode_unknown(const cJSON *p, struct oasp_unknown *out)
 {
     if (p == NULL) {
@@ -333,6 +353,12 @@ oasp_decode(struct str json, struct oasp_message *msg)
     } else if (strcmp(msg->name, "TR") == 0) {
         msg->kind = OASP_TR;
         err = decode_tr(params, &msg->u.tr);
+    } else if (strcmp(msg->name, "Text") == 0) {
+        msg->kind = OASP_TEXT;
+        err = decode_text(params, &msg->u.text);
+    } else if (strcmp(msg->name, "Logger") == 0) {
+        msg->kind = OASP_LOGGER;
+        err = decode_logger(params, &msg->u.logger);
     } else {
         msg->kind = OASP_UNKNOWN;
         err = decode_unknown(params, &msg->u.unknown);
@@ -430,7 +456,7 @@ oasp_encode_hello(struct buf *out, int sequence,
               cJSON_AddStringToObject(p, "Name", hello->name) != NULL &&
               cJSON_AddBoolToObject(p, "Bidirectional",
                                     hello->bidirectional) != NULL;
-    /* The server's own client leaves IndicateTR out unless it is true. */
+    /* IndicateTR is left out unless it is true. */
     if (ok && hello->indicate_tr) {
         ok = cJSON_AddTrueToObject(p, "IndicateTR") != NULL;
     }
@@ -460,20 +486,31 @@ oasp_encode_radio(struct buf *out, int sequence, struct oasp_radio_id id,
     return finish(out, root, ok);
 }
 
-/* One entry of an Antenna request: {"TX":1,"Antenna":id} or the RX form. */
+/* One entry of an Antenna request: {"TX":change,"Antenna":id}, or RX. */
 static bool
-add_choice(cJSON *arr, const char *side, int antenna)
+add_choice(cJSON *arr, const char *side, int change, int antenna)
 {
     cJSON *c = cJSON_CreateObject();
-    return c != NULL && cJSON_AddItemToArray(arr, c) && add_int(c, side, 1) &&
-           add_int(c, "Antenna", antenna);
+    return c != NULL && cJSON_AddItemToArray(arr, c) &&
+           add_int(c, side, change) && add_int(c, "Antenna", antenna);
+}
+
+static bool
+valid_change(int change)
+{
+    return (change >= OASP_CHANGE_NONE && change <= OASP_CHANGE_PREVIOUS) ||
+           change == OASP_CHANGE_SAME_AS_TX;
 }
 
 int
 oasp_encode_antenna(struct buf *out, int sequence, struct oasp_radio_id id,
-                    int antenna, bool tx, bool rx)
+                    int antenna, int tx_change, int rx_change)
 {
-    if (!tx && !rx) {
+    bool tx = tx_change != OASP_CHANGE_NONE;
+    bool rx = rx_change != OASP_CHANGE_NONE;
+    if ((!tx && !rx) || !valid_change(tx_change) || !valid_change(rx_change) ||
+        tx_change == OASP_CHANGE_SAME_AS_TX)
+    {
         return ERR_INVALID;
     }
     cJSON *root;
@@ -486,18 +523,21 @@ oasp_encode_antenna(struct buf *out, int sequence, struct oasp_radio_id id,
     cJSON *arr = ok ? cJSON_AddArrayToObject(p, "Antennas") : NULL;
     ok = arr != NULL;
     if (ok && tx) {
-        ok = add_choice(arr, "TX", antenna);
+        ok = add_choice(arr, "TX", tx_change, antenna);
     }
     if (ok && rx) {
-        ok = add_choice(arr, "RX", antenna);
+        ok = add_choice(arr, "RX", rx_change, antenna);
     }
     return finish(out, root, ok);
 }
 
 int
 oasp_encode_function(struct buf *out, int sequence, struct oasp_radio_id id,
-                     int function)
+                     int function, int change)
 {
+    if (change < OASP_FUNCTION_SELECT || change > OASP_FUNCTION_ALTERNATE) {
+        return ERR_INVALID;
+    }
     cJSON *root;
     cJSON *p;
     int err = begin("Function", sequence, &root, &p);
@@ -505,6 +545,31 @@ oasp_encode_function(struct buf *out, int sequence, struct oasp_radio_id id,
         return err;
     }
     bool ok = add_radio_id(p, id) && add_int(p, "Function", function) &&
-              add_int(p, "State", 1);
+              add_int(p, "State", change);
+    return finish(out, root, ok);
+}
+
+int
+oasp_encode_logger(struct buf *out, int sequence, struct oasp_radio_id id,
+                   const char *message)
+{
+    size_t len = message != NULL ? strlen(message) : 0;
+    if (message == NULL || len >= CAPS_OASP_NOTICE) {
+        return ERR_INVALID;
+    }
+    for (size_t i = 0; i < len; i++) {
+        unsigned char ch = (unsigned char)message[i];
+        if (ch < 0x20 || ch > 0x7e) {
+            return ERR_INVALID; /* printable ASCII only */
+        }
+    }
+    cJSON *root;
+    cJSON *p;
+    int err = begin("Logger", sequence, &root, &p);
+    if (err != 0) {
+        return err;
+    }
+    bool ok = add_radio_id(p, id) &&
+              cJSON_AddStringToObject(p, "Message", message) != NULL;
     return finish(out, root, ok);
 }

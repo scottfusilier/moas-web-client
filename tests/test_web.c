@@ -43,6 +43,14 @@ struct fixture {
     size_t received_count;
     int sequence;
     bool keyed;
+    /*
+     * With full, the fake's configuration also has an additive antenna
+     * (60, "Bev-Combo") and an on/off, alternate function (1, "Inhibit"),
+     * whose states it keeps.
+     */
+    bool full;
+    bool combo_on;
+    bool inhibit_on;
 };
 
 static struct fixture fx;
@@ -109,15 +117,25 @@ antenna_name(int id)
 static void
 send_state(int station, int radio, int tx, int rx)
 {
-    char p[512];
+    char p[768];
+    char extra_antennas[96] = "";
+    char extra_functions[64] = "";
+    if (fx.full) {
+        int combo = fx.combo_on ? 2 : 1;
+        snprintf(extra_antennas, sizeof(extra_antennas),
+                 ",{\"Antenna\":60,\"TX\":%d,\"RX\":%d}", combo, combo);
+        snprintf(extra_functions, sizeof(extra_functions),
+                 ",{\"Function\":1,\"State\":%d}", fx.inhibit_on ? 2 : 1);
+    }
     snprintf(p, sizeof(p),
              "{\"Station\":%d,\"Radio\":%d,\"TXShortName\":\"%s\","
              "\"TXId\":%d,\"RXShortName\":\"%s\",\"RXId\":%d,"
              "\"Antennas\":[{\"Antenna\":12,\"TX\":%d,\"RX\":%d},"
-             "{\"Antenna\":50,\"TX\":0,\"RX\":%d}],"
-             "\"Functions\":[{\"Function\":0,\"State\":0}]}",
+             "{\"Antenna\":50,\"TX\":0,\"RX\":%d}%s],"
+             "\"Functions\":[{\"Function\":0,\"State\":0}%s]}",
              station, radio, antenna_name(tx), tx, antenna_name(rx), rx,
-             mark(12, tx, 1), mark(12, rx, 1), mark(50, rx, 1));
+             mark(12, tx, 1), mark(12, rx, 1), mark(50, rx, 1), extra_antennas,
+             extra_functions);
     fake_send("State", p);
 }
 
@@ -156,22 +174,38 @@ on_fake_message(struct fake_server *server, const cJSON *msg, void *arg)
                             "\"Columns\":5,\"TXRX\":true}");
         fake_send("Rotators", "{\"Rotators\":[]}");
     } else if (strcmp(name, "Radio") == 0) {
-        char p[768];
+        char p[1024];
         snprintf(p, sizeof(p),
                  "{\"Station\":%d,\"Radio\":%d,\"LowerFrequency\":7000,"
                  "\"UpperFrequency\":7300,\"Antennas\":["
                  "{\"Antenna\":12,\"ShortName\":\"40m-Yagi\",\"LongName\":"
                  "\"40m Yagi\",\"Row\":0,\"Column\":0},"
                  "{\"Antenna\":50,\"ShortName\":\"Bev-NE\",\"LongName\":"
-                 "\"Northeast Beverage\",\"Row\":0,\"Column\":4}],"
+                 "\"Northeast Beverage\",\"Row\":0,\"Column\":4}%s],"
                  "\"Functions\":[{\"Function\":0,\"ShortName\":\"Swap\","
                  "\"LongName\":\"Swap antennas\",\"Momentary\":true,"
-                 "\"Row\":5,\"Column\":0}]}",
-                 station, radio);
+                 "\"Row\":5,\"Column\":0}%s]}",
+                 station, radio,
+                 fx.full ? ",{\"Antenna\":60,\"ShortName\":\"Bev-Combo\","
+                           "\"Additive\":true,\"Row\":1,\"Column\":4}"
+                         : "",
+                 fx.full ? ",{\"Function\":1,\"ShortName\":\"Inhibit\","
+                           "\"Momentary\":false,\"Alternate\":true,\"Row\":5,"
+                           "\"Column\":1}"
+                         : "");
         fake_send("Configuration", p);
         send_state(station, radio, 12, 12);
         send_tr(station, radio, 2);
     } else if (strcmp(name, "Function") == 0) {
+        if (number(params, "Function") == 1) {
+            /* Inhibit: on, off, or toggled. */
+            int state = number(params, "State");
+            fx.inhibit_on = state == 1   ? true
+                            : state == 2 ? false
+                                         : !fx.inhibit_on;
+            send_state(station, radio, 12, 12);
+            return;
+        }
         /*
          * The fake has no switch to key, so Swap stands in for keying the
          * radio: it toggles between transmit and receive.
@@ -185,11 +219,22 @@ on_fake_message(struct fake_server *server, const cJSON *msg, void *arg)
         cJSON_ArrayForEach(
             choice, cJSON_GetObjectItemCaseSensitive(params, "Antennas"))
         {
+            int id = number(choice, "Antenna");
+            int change = cJSON_HasObjectItem(choice, "TX")
+                             ? number(choice, "TX")
+                             : number(choice, "RX");
+            if (id == 60 && (change == 3 || change == 4)) {
+                fx.combo_on = change == 3; /* the additive one */
+                continue;
+            }
+            if (id == 0) {
+                continue; /* next or previous: the fake has no list */
+            }
             if (cJSON_HasObjectItem(choice, "TX")) {
-                tx = number(choice, "Antenna");
+                tx = id;
             }
             if (cJSON_HasObjectItem(choice, "RX")) {
-                rx = number(choice, "Antenna");
+                rx = change == 99 ? tx : id;
             }
         }
         send_state(station, radio, tx, rx);
@@ -495,13 +540,13 @@ test_page_drives_server(void)
     const char *want[] = {
         "{\"row\":0,\"column\":0,\"kind\":\"antenna\",\"id\":12,\"name\":"
         "\"40m-Yagi\",\"longName\":\"40m Yagi\",\"tx\":2,\"rx\":2,"
-        "\"state\":0}",
+        "\"state\":0,\"additive\":false}",
         "{\"row\":0,\"column\":4,\"kind\":\"antenna\",\"id\":50,\"name\":"
         "\"Bev-NE\",\"longName\":\"Northeast Beverage\",\"tx\":0,\"rx\":1,"
-        "\"state\":0}",
+        "\"state\":0,\"additive\":false}",
         "{\"row\":5,\"column\":0,\"kind\":\"function\",\"id\":0,\"name\":"
         "\"Swap\",\"longName\":\"Swap antennas\",\"tx\":0,\"rx\":0,"
-        "\"state\":0}",
+        "\"state\":0,\"momentary\":true,\"alternate\":false}",
     };
     for (int i = 0; i < 3; i++) {
         char *got = cJSON_PrintUnformatted(cJSON_GetArrayItem(buttons, i));
@@ -1019,6 +1064,235 @@ test_rigctld_route(void)
     stop();
 }
 
+/*
+ * The next Antenna message: its one or two choices, as "TX:3/60" or
+ * "TX:6/0,RX:6/0" (change/antenna), written to out.
+ */
+static void
+next_antenna(char *out, size_t size, int line)
+{
+    cJSON *p = next_message("Antenna", line);
+    out[0] = '\0';
+    const cJSON *choice;
+    size_t used = 0;
+    cJSON_ArrayForEach(choice, cJSON_GetObjectItemCaseSensitive(p, "Antennas"))
+    {
+        bool tx = cJSON_HasObjectItem(choice, "TX");
+        int n = snprintf(out + used, size - used, "%s%s:%d/%d",
+                         used > 0 ? "," : "", tx ? "TX" : "RX",
+                         number(choice, tx ? "TX" : "RX"),
+                         number(choice, "Antenna"));
+        if (n < 0 || (size_t)n >= size - used) {
+            break;
+        }
+        used += (size_t)n;
+    }
+    cJSON_Delete(p);
+}
+
+#define EXPECT_ANTENNA(want)                                                  \
+    do {                                                                      \
+        char got_[64];                                                        \
+        next_antenna(got_, sizeof(got_), __LINE__);                           \
+        CHECK_MEM_EQ(got_, strlen(got_), (want));                             \
+    } while (0)
+
+static void
+expect_function(int function, int state, int line)
+{
+    cJSON *p = next_message("Function", line);
+    test_check_int(number(p, "Function"), function, "Function", "function",
+                   __FILE__, line);
+    test_check_int(number(p, "State"), state, "State", "state", __FILE__,
+                   line);
+    cJSON_Delete(p);
+}
+#define EXPECT_FUNCTION(f, s) expect_function((f), (s), __LINE__)
+
+static bool
+five_buttons(const cJSON *snap)
+{
+    return button_count(snap) == 5;
+}
+
+/* The state the page shows for button id of kind, or -1. */
+static int
+button_value(const cJSON *snap, const char *kind, int id, const char *key)
+{
+    const cJSON *b;
+    cJSON_ArrayForEach(
+        b, cJSON_GetObjectItemCaseSensitive(radio_of(snap), "buttons"))
+    {
+        if (strcmp(text(b, "kind"), kind) == 0 && number(b, "id") == id) {
+            return number(b, key);
+        }
+    }
+    return -1;
+}
+
+static bool
+combo_selected(const cJSON *snap)
+{
+    return button_value(snap, "antenna", 60, "tx") == 2;
+}
+
+static bool
+combo_available(const cJSON *snap)
+{
+    return button_value(snap, "antenna", 60, "tx") == 1;
+}
+
+static bool
+inhibit_on(const cJSON *snap)
+{
+    return button_value(snap, "function", 1, "state") == 2;
+}
+
+static bool
+inhibit_off(const cJSON *snap)
+{
+    return button_value(snap, "function", 1, "state") == 1;
+}
+
+static const char sel_combo[] =
+    "{\"station\":1,\"radio\":1,\"antenna\":60,\"tx\":true,\"rx\":true}";
+static const char fn_inhibit[] = "{\"station\":1,\"radio\":1,\"function\":1}";
+
+/*
+ * Antenna systems, on/off functions, relative antennas and RX the same as
+ * TX: what a click sends depends on what the server said about the button.
+ */
+static void
+test_every_kind_of_button(void)
+{
+    if (!start_loop()) {
+        return;
+    }
+    fx.full = true;
+    if (!start_app(NULL)) {
+        stop();
+        return;
+    }
+    connect_up();
+    post("/api/frequency", "{\"station\":1,\"radio\":1,\"frequency\":7000}");
+    EXPECT_RADIO(7000);
+    WAIT_FOR(five_buttons);
+
+    cJSON *snap = snapshot();
+    CHECK(button_value(snap, "antenna", 60, "additive") == -1); /* a bool */
+    const cJSON *b = cJSON_GetArrayItem(
+        cJSON_GetObjectItemCaseSensitive(radio_of(snap), "buttons"), 2);
+    CHECK(is_true(b, "additive"));
+    cJSON_Delete(snap);
+
+    /* An ordinary antenna replaces the selection in its system. */
+    CHECK_INT_EQ(post("/api/select", "{\"station\":1,\"radio\":1,"
+                                     "\"antenna\":12,\"tx\":true}"),
+                 204);
+    EXPECT_ANTENNA("TX:1/12");
+
+    /* An additive one is added, then taken away. */
+    CHECK_INT_EQ(post("/api/select", sel_combo), 204);
+    EXPECT_ANTENNA("TX:3/60,RX:3/60");
+    WAIT_FOR(combo_selected);
+    CHECK_INT_EQ(post("/api/select", sel_combo), 204);
+    EXPECT_ANTENNA("TX:4/60,RX:4/60");
+    WAIT_FOR(combo_available);
+
+    /* An on/off function: on, then off; then toggled as an alternate. */
+    CHECK_INT_EQ(post("/api/function", fn_inhibit), 204);
+    EXPECT_FUNCTION(1, 1);
+    WAIT_FOR(inhibit_on);
+    CHECK_INT_EQ(post("/api/function", fn_inhibit), 204);
+    EXPECT_FUNCTION(1, 2);
+    WAIT_FOR(inhibit_off);
+    CHECK_INT_EQ(post("/api/function", "{\"station\":1,\"radio\":1,"
+                                       "\"function\":1,\"alternate\":true}"),
+                 204);
+    EXPECT_FUNCTION(1, 3);
+    WAIT_FOR(inhibit_on);
+    /* A momentary function always says select, and has no alternate. */
+    CHECK_INT_EQ(post("/api/function", "{\"station\":1,\"radio\":1,"
+                                       "\"function\":0}"),
+                 204);
+    EXPECT_FUNCTION(0, 1);
+    CHECK_INT_EQ(post("/api/function", "{\"station\":1,\"radio\":1,"
+                                       "\"function\":0,\"alternate\":true}"),
+                 400);
+
+    /* The relative antenna list, both ways. */
+    CHECK_INT_EQ(post("/api/step", "{\"station\":1,\"radio\":1,"
+                                   "\"direction\":\"next\"}"),
+                 204);
+    EXPECT_ANTENNA("TX:6/0,RX:6/0");
+    CHECK_INT_EQ(post("/api/step", "{\"station\":1,\"radio\":1,"
+                                   "\"direction\":\"previous\"}"),
+                 204);
+    EXPECT_ANTENNA("TX:7/0,RX:7/0");
+    CHECK_INT_EQ(post("/api/step", "{\"station\":1,\"radio\":1,"
+                                   "\"direction\":\"up\"}"),
+                 400);
+
+    /* Receive on the transmit antenna. */
+    CHECK_INT_EQ(post("/api/rx-same-as-tx", "{\"station\":1,\"radio\":1}"),
+                 204);
+    EXPECT_ANTENNA("TX:2/12,RX:99/12");
+    CHECK_INT_EQ(post("/api/rx-same-as-tx", "{\"station\":1,\"radio\":2}"),
+                 400); /* not a radio this client serves */
+    EXPECT_NOTHING(100);
+    stop();
+}
+
+static bool
+has_logger(const cJSON *snap)
+{
+    return strcmp(text(radio_of(snap), "logger"), "CQ TEST") == 0;
+}
+
+static bool
+unavailable(const cJSON *snap)
+{
+    return strcmp(text(radio_of(snap), "keying"), "unavailable") == 0;
+}
+
+static bool
+refused(const cJSON *snap)
+{
+    return is_true(snap, "refused") && !is_true(snap, "connected");
+}
+
+/* What the server tells the user: logger text, TR 0, and a refusal. */
+static void
+test_server_notices(void)
+{
+    if (!start(NULL)) {
+        return;
+    }
+    connect_up();
+    post("/api/frequency", "{\"station\":1,\"radio\":1,\"frequency\":7000}");
+    EXPECT_RADIO(7000);
+    WAIT_FOR(three_buttons);
+
+    fake_send("Logger", "{\"Station\":1,\"Radio\":1,\"Message\":\"CQ TEST\"}");
+    WAIT_FOR(has_logger);
+    send_tr(1, 1, 0);
+    WAIT_FOR(unavailable);
+
+    /* A refusal: shown, and not asked again every few seconds. */
+    fake_send("Text", "{\"Action\":1,\"Text\":\"Another client is already "
+                      "connected\"}");
+    fake_server_drop_client(fx.fake);
+    WAIT_FOR(refused);
+    cJSON *snap = snapshot();
+    CHECK_MEM_EQ(text(snap, "notice"), strlen(text(snap, "notice")),
+                 "Another client is already connected");
+    cJSON_Delete(snap);
+    int accepted = fake_server_accepted(fx.fake);
+    wait_ms(500); /* many times the usual retry pause in these tests */
+    CHECK_INT_EQ(fake_server_accepted(fx.fake), accepted);
+    stop();
+}
+
 int
 main(void)
 {
@@ -1033,6 +1307,8 @@ main(void)
     RUN(test_follower);
     RUN(test_settings_routes);
     RUN(test_rigctld_route);
+    RUN(test_every_kind_of_button);
+    RUN(test_server_notices);
     plat_net_fini();
     return test_summary();
 }

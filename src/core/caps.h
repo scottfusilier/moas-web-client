@@ -43,6 +43,12 @@
  */
 #define CAPS_OASP_TEXT 128
 
+/*
+ * Longest text the server shows the user (Text), or passes on from a logger
+ * (Logger), in bytes of UTF-8, including the NUL.
+ */
+#define CAPS_OASP_NOTICE 512
+
 /* Longest message name ("Configuration"), including the NUL. */
 #define CAPS_OASP_MESSAGE_NAME 32
 

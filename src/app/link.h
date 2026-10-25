@@ -12,7 +12,9 @@
  * disturb the antenna selection.
  *
  * It knows no antenna rules: what may be selected is whatever the server's
- * last State said.
+ * last State said.  It only picks the kind of request a click makes from
+ * what the server said about the button (additive, momentary).  It also
+ * keeps the server's last Text, so that a refusal stays on the page.
  */
 
 #ifndef MOAS_APP_LINK_H
@@ -52,11 +54,35 @@ bool app_link_connected(const struct app_link *link);
 int app_link_set_frequency(struct app_link *link, struct oasp_radio_id id,
                            int khz, const char *origin);
 
-/* ERR_CLOSED if not connected. */
+/*
+ * Requests to the server for a radio.  Each returns ERR_INVALID for a radio
+ * this client does not serve, and ERR_CLOSED if not connected.
+ */
+
+/*
+ * A click on an antenna, for transmit, receive or both.  An antenna in an
+ * additive system is added if it is available and taken away if it is
+ * selected; any other replaces the selection in its system.
+ */
 int app_link_select(struct app_link *link, struct oasp_radio_id id,
                     int antenna, bool tx, bool rx);
+
+/*
+ * A click on a function: a momentary one acts once; any other is turned
+ * off if it is on, and on otherwise.  With alternate, toggles a function
+ * the server marks Alternate (ERR_INVALID for any other).
+ */
 int app_link_function(struct app_link *link, struct oasp_radio_id id,
-                      int function);
+                      int function, bool alternate);
+
+/* The next (or previous) antenna in the band's relative antenna list. */
+int app_link_step(struct app_link *link, struct oasp_radio_id id, bool next);
+
+/*
+ * Receive on the antenna transmit uses.  ERR_AGAIN if the server has not
+ * said what transmit uses yet.
+ */
+int app_link_rx_same_as_tx(struct app_link *link, struct oasp_radio_id id);
 
 /* Shows a radio's frequency sources in snapshots (NULL: none). */
 void app_link_track(struct app_link *link, struct oasp_radio_id id,

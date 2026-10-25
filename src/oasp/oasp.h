@@ -6,7 +6,7 @@
 /*
  * The protocol spoken between a MOAS client and a MOAS server over TCP
  * (port 12059 by default), which names itself "OASP".  Written to work with
- * MOAS Server by M1DST and K1XM, and tested against v2.0.2.  It covers the
+ * MOAS Server by M1DST and K1XM, and tested against v2.0.4.  It covers the
  * messages needed for antenna selection.
  *
  * Each message is one JSON object:
@@ -68,6 +68,8 @@ enum oasp_kind {
     OASP_CONFIGURATION, /* the buttons for one radio's band */
     OASP_STATE,         /* what one radio uses and may select */
     OASP_TR,            /* transmit/receive status of one radio */
+    OASP_TEXT,          /* text for the user, perhaps asking to stop */
+    OASP_LOGGER,        /* a logger's message for one radio */
     OASP_UNKNOWN,       /* a message this library does not know */
 };
 
@@ -99,10 +101,23 @@ struct oasp_antenna_button {
     char long_name[CAPS_OASP_TEXT];
     struct oasp_antenna_description descriptions[CAPS_OASP_DESCRIPTIONS];
     size_t description_count;
+    /*
+     * Part of an additive antenna system: it is added to, or taken from,
+     * what is selected (OASP_CHANGE_ADD, OASP_CHANGE_REMOVE) rather than
+     * replacing it.
+     */
+    bool additive;
     int row;
     int column;
 };
 
+/*
+ * A function, or a relay group shown as one.  A momentary function acts
+ * once each time it is selected.  Any other is on or off, as its state in
+ * State says (OASP_SELECTED is on): it is turned on with
+ * OASP_FUNCTION_SELECT and off with OASP_FUNCTION_DESELECT.  An alternate
+ * one may instead be toggled with OASP_FUNCTION_ALTERNATE.
+ */
 struct oasp_function_button {
     int function; /* the function's ID */
     char short_name[CAPS_OASP_TEXT];
@@ -172,20 +187,47 @@ struct oasp_state {
  * Transmit/receive status of one radio, sent when it changes, and only if
  * the switch's IndicateTR is true in the server's configuration.  For
  * example, keying radio 1 gives 3 for radio 1, and 1 for radio 2 when an
- * Always rule inhibits it; releasing gives 2 for both.  A server with no
- * switch attached sends other values.
+ * Always rule inhibits it; releasing gives 2 for both.  0 means the server
+ * cannot tell, because the switch is not reachable.
  */
+#define OASP_TR_UNAVAILABLE 0
 #define OASP_TR_INHIBITED 1
 #define OASP_TR_RECEIVE 2
 #define OASP_TR_TRANSMIT 3
 
-/* "inhibited", "receive", "transmit", or "" for any other value. */
+/*
+ * "unavailable", "inhibited", "receive", "transmit", or "" for any other
+ * value.
+ */
 const char *oasp_tr_name(int tr);
 
 struct oasp_tr {
     int station;
     int radio;
     int tr;
+};
+
+/*
+ * Text for the user.  With OASP_TEXT_EXIT the server is refusing this
+ * client, as when it allows only one client and another is connected; it
+ * then drops the connection.
+ */
+#define OASP_TEXT_NONE 0
+#define OASP_TEXT_EXIT 1
+
+struct oasp_text {
+    int action;
+    char text[CAPS_OASP_NOTICE];
+};
+
+/*
+ * A logger's message for one radio (such as the text of an F-key it is
+ * sending), passed on by the server from the client that sent it.
+ */
+struct oasp_logger {
+    int station;
+    int radio;
+    char message[CAPS_OASP_NOTICE];
 };
 
 /* A message this library does not know: its parameters, as compact JSON. */
@@ -204,6 +246,8 @@ struct oasp_message {
         struct oasp_configuration configuration;
         struct oasp_state state;
         struct oasp_tr tr;
+        struct oasp_text text;
+        struct oasp_logger logger;
         struct oasp_unknown unknown;
     } u;
 };
@@ -231,7 +275,7 @@ void oasp_message_take(struct oasp_message *dst, struct oasp_message *src);
 
 /*
  * Encoding.  Each appends one message with the given sequence number to
- * out, as compact JSON in the field order the server's own client uses.
+ * out, as compact JSON with the fields in the usual order.
  */
 int oasp_encode_hello(struct buf *out, int sequence,
                       const struct oasp_hello *hello);
@@ -241,15 +285,54 @@ int oasp_encode_radio(struct buf *out, int sequence, struct oasp_radio_id id,
                       int khz);
 
 /*
- * Asks for an antenna for transmit, receive, or both; receive only gives a
- * split.  ERR_INVALID if neither tx nor rx.  The server does not reply to a
- * request it will not honour; its next State shows what is selected.
+ * How an Antenna message changes the transmit or the receive antenna.
+ */
+enum oasp_antenna_change {
+    OASP_CHANGE_NONE = 0, /* leave it */
+    /*
+     * Select this antenna in place of the others in its antenna system (for
+     * an antenna in no system, in place of everything).  Selecting an
+     * exclusive part of an additive system that is already selected turns
+     * it off.
+     */
+    OASP_CHANGE_SYSTEM = 1,
+    OASP_CHANGE_ALL = 2,         /* select this antenna, and only it */
+    OASP_CHANGE_ADD = 3,         /* add an additive antenna */
+    OASP_CHANGE_REMOVE = 4,      /* take an additive antenna away */
+    OASP_CHANGE_NUMBER = 5,      /* entry "antenna" of the relative list */
+    OASP_CHANGE_NEXT = 6,        /* the next antenna in the relative list */
+    OASP_CHANGE_PREVIOUS = 7,    /* the previous one */
+    OASP_CHANGE_SAME_AS_TX = 99, /* receive: whatever transmit uses */
+};
+
+/*
+ * Asks for an antenna change for transmit, receive, or both.  The antenna
+ * ID is 0 for OASP_CHANGE_NEXT and OASP_CHANGE_PREVIOUS, which do not name
+ * one; OASP_CHANGE_SAME_AS_TX is for rx only.  ERR_INVALID if both changes
+ * are OASP_CHANGE_NONE or a change is not one of the values above.  The
+ * server does not reply to a request it will not honour; its next State
+ * shows what is selected.
  */
 int oasp_encode_antenna(struct buf *out, int sequence, struct oasp_radio_id id,
-                        int antenna, bool tx, bool rx);
+                        int antenna, int tx_change, int rx_change);
 
-/* Activates one of the functions in the radio's configuration. */
+/* What a Function message asks of a function; see oasp_function_button. */
+enum oasp_function_change {
+    OASP_FUNCTION_SELECT = 1,
+    OASP_FUNCTION_DESELECT = 2,
+    OASP_FUNCTION_ALTERNATE = 3,
+};
+
+/* Changes one of the functions in the radio's configuration. */
 int oasp_encode_function(struct buf *out, int sequence,
-                         struct oasp_radio_id id, int function);
+                         struct oasp_radio_id id, int function, int change);
+
+/*
+ * Passes a logger's message for one radio to the server, which shows it
+ * to the other clients serving that radio.  Printable ASCII only, at most
+ * CAPS_OASP_NOTICE - 1 bytes; ERR_INVALID otherwise.  "" clears it.
+ */
+int oasp_encode_logger(struct buf *out, int sequence, struct oasp_radio_id id,
+                       const char *message);
 
 #endif /* MOAS_OASP_OASP_H */

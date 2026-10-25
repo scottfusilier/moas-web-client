@@ -25,6 +25,7 @@ struct radio {
     struct oasp_message state;
     int tr;
     bool have_tr;
+    char logger[CAPS_OASP_NOTICE]; /* a logger's message for it; "" if none */
 };
 
 struct app_link {
@@ -44,7 +45,17 @@ struct app_link {
     bool connected;
     struct oasp_message server;
     char last_error[CAPS_FREQ_ERROR];
+    /*
+     * The server's last Text, kept across reconnecting so that a refusal
+     * stays on the page; one asking this client to stop goes once a server
+     * accepts it.
+     */
+    char notice[CAPS_OASP_NOTICE];
+    bool notice_exit;
 };
+
+/* After a server refuses this client, how long before asking again. */
+#define REFUSED_RETRY_MS 60000
 
 static void
 changed(struct app_link *l)
@@ -76,6 +87,7 @@ forget_server(struct app_link *l)
         oasp_message_free(&l->radios[i].configuration);
         oasp_message_free(&l->radios[i].state);
         l->radios[i].have_tr = false;
+        l->radios[i].logger[0] = '\0';
     }
 }
 
@@ -97,13 +109,35 @@ on_connected(struct oasp_client *client, void *arg)
 static void
 on_message(struct oasp_client *client, struct oasp_message *msg, void *arg)
 {
-    (void)client;
     struct app_link *l = arg;
     struct radio *r;
 
     switch (msg->kind) {
     case OASP_SERVER:
         oasp_message_take(&l->server, msg);
+        /* Accepted: an earlier refusal no longer applies. */
+        if (l->notice_exit) {
+            l->notice[0] = '\0';
+            l->notice_exit = false;
+        }
+        break;
+    case OASP_TEXT:
+        snprintf(l->notice, sizeof(l->notice), "%s", msg->u.text.text);
+        l->notice_exit = msg->u.text.action == OASP_TEXT_EXIT;
+        if (l->notice_exit) {
+            log_warn("the MOAS server refused this client: %s",
+                     l->notice[0] != '\0' ? l->notice : "(no reason given)");
+            oasp_client_retry_later(client, REFUSED_RETRY_MS);
+        } else {
+            log_info("the MOAS server says: %s", l->notice);
+        }
+        break;
+    case OASP_LOGGER:
+        r = find_radio(l, msg->u.logger.station, msg->u.logger.radio);
+        if (r != NULL) {
+            snprintf(r->logger, sizeof(r->logger), "%s",
+                     msg->u.logger.message);
+        }
         break;
     case OASP_CONFIGURATION:
         r = find_radio(l, msg->u.configuration.station,
@@ -311,23 +345,143 @@ app_link_set_frequency(struct app_link *l, struct oasp_radio_id id, int khz,
     return oasp_client_send_radio(l->client, id, khz);
 }
 
+static const struct oasp_antenna_state *antenna_state(const struct radio *r,
+                                                      int antenna);
+static int function_state(const struct radio *r, int function);
+
+static const struct oasp_antenna_button *
+antenna_button(const struct radio *r, int antenna)
+{
+    if (r->configuration.kind != OASP_CONFIGURATION) {
+        return NULL;
+    }
+    const struct oasp_configuration *c = &r->configuration.u.configuration;
+    for (size_t i = 0; i < c->antenna_count; i++) {
+        if (c->antennas[i].antenna == antenna) {
+            return &c->antennas[i];
+        }
+    }
+    return NULL;
+}
+
+static const struct oasp_function_button *
+function_button(const struct radio *r, int function)
+{
+    if (r->configuration.kind != OASP_CONFIGURATION) {
+        return NULL;
+    }
+    const struct oasp_configuration *c = &r->configuration.u.configuration;
+    for (size_t i = 0; i < c->function_count; i++) {
+        if (c->functions[i].function == function) {
+            return &c->functions[i];
+        }
+    }
+    return NULL;
+}
+
+/* Adds an additive antenna if it is available, or takes it away. */
+static int
+toggle(int availability)
+{
+    return availability == OASP_SELECTED    ? OASP_CHANGE_REMOVE
+           : availability == OASP_AVAILABLE ? OASP_CHANGE_ADD
+                                            : OASP_CHANGE_NONE;
+}
+
 int
 app_link_select(struct app_link *l, struct oasp_radio_id id, int antenna,
                 bool tx, bool rx)
 {
+    struct radio *r = find_radio(l, id.station, id.radio);
+    if (r == NULL || (!tx && !rx)) {
+        return ERR_INVALID;
+    }
     if (!l->connected) {
         return ERR_CLOSED;
     }
-    return oasp_client_send_antenna(l->client, id, antenna, tx, rx);
+    int tx_change = tx ? OASP_CHANGE_SYSTEM : OASP_CHANGE_NONE;
+    int rx_change = rx ? OASP_CHANGE_SYSTEM : OASP_CHANGE_NONE;
+
+    const struct oasp_antenna_button *b = antenna_button(r, antenna);
+    if (b != NULL && b->additive) {
+        const struct oasp_antenna_state *s = antenna_state(r, antenna);
+        int tx_now = s != NULL ? s->tx : OASP_UNAVAILABLE;
+        int rx_now = s != NULL ? s->rx : OASP_UNAVAILABLE;
+        tx_change = tx ? toggle(tx_now) : OASP_CHANGE_NONE;
+        if (rx && tx_change != OASP_CHANGE_NONE) {
+            /* Receive goes the same way as transmit, where it can. */
+            rx_change = rx_now != OASP_UNAVAILABLE ? tx_change
+                                                   : OASP_CHANGE_NONE;
+        } else {
+            rx_change = rx ? toggle(rx_now) : OASP_CHANGE_NONE;
+        }
+        if (tx_change == OASP_CHANGE_NONE && rx_change == OASP_CHANGE_NONE) {
+            return 0; /* unavailable either way: nothing to ask */
+        }
+    }
+    return oasp_client_send_antenna(l->client, id, antenna, tx_change,
+                                    rx_change);
 }
 
 int
-app_link_function(struct app_link *l, struct oasp_radio_id id, int function)
+app_link_function(struct app_link *l, struct oasp_radio_id id, int function,
+                  bool alternate)
 {
+    struct radio *r = find_radio(l, id.station, id.radio);
+    if (r == NULL) {
+        return ERR_INVALID;
+    }
     if (!l->connected) {
         return ERR_CLOSED;
     }
-    return oasp_client_send_function(l->client, id, function);
+    int change = OASP_FUNCTION_SELECT;
+    const struct oasp_function_button *f = function_button(r, function);
+    if (f != NULL && !f->momentary) {
+        if (alternate) {
+            if (!f->alternate) {
+                return ERR_INVALID;
+            }
+            change = OASP_FUNCTION_ALTERNATE;
+        } else if (function_state(r, function) == OASP_SELECTED) {
+            change = OASP_FUNCTION_DESELECT; /* it is on: turn it off */
+        }
+    } else if (alternate) {
+        return ERR_INVALID;
+    }
+    return oasp_client_send_function(l->client, id, function, change);
+}
+
+int
+app_link_step(struct app_link *l, struct oasp_radio_id id, bool next)
+{
+    if (find_radio(l, id.station, id.radio) == NULL) {
+        return ERR_INVALID;
+    }
+    if (!l->connected) {
+        return ERR_CLOSED;
+    }
+    int change = next ? OASP_CHANGE_NEXT : OASP_CHANGE_PREVIOUS;
+    return oasp_client_send_antenna(l->client, id, 0, change, change);
+}
+
+int
+app_link_rx_same_as_tx(struct app_link *l, struct oasp_radio_id id)
+{
+    struct radio *r = find_radio(l, id.station, id.radio);
+    if (r == NULL) {
+        return ERR_INVALID;
+    }
+    if (!l->connected) {
+        return ERR_CLOSED;
+    }
+    if (r->state.kind != OASP_STATE ||
+        r->state.u.state.tx_short_name[0] == '\0')
+    {
+        return ERR_AGAIN; /* no transmit antenna to follow yet */
+    }
+    /* Transmit stays as it is; receive takes the same antenna. */
+    return oasp_client_send_antenna(l->client, id, r->state.u.state.tx_id,
+                                    OASP_CHANGE_ALL, OASP_CHANGE_SAME_AS_TX);
 }
 
 void
@@ -449,7 +603,8 @@ add_buttons(cJSON *radio, const struct radio *r)
             !add_text(b, "longName", a->long_name) ||
             !add_int(b, "tx", s != NULL ? s->tx : 0) ||
             !add_int(b, "rx", s != NULL ? s->rx : 0) ||
-            !add_int(b, "state", 0))
+            !add_int(b, "state", 0) ||
+            cJSON_AddBoolToObject(b, "additive", a->additive) == NULL)
         {
             return false;
         }
@@ -464,7 +619,9 @@ add_buttons(cJSON *radio, const struct radio *r)
             !add_text(b, "name", f->short_name) ||
             !add_text(b, "longName", f->long_name) || !add_int(b, "tx", 0) ||
             !add_int(b, "rx", 0) ||
-            !add_int(b, "state", function_state(r, f->function)))
+            !add_int(b, "state", function_state(r, f->function)) ||
+            cJSON_AddBoolToObject(b, "momentary", f->momentary) == NULL ||
+            cJSON_AddBoolToObject(b, "alternate", f->alternate) == NULL)
         {
             return false;
         }
@@ -497,7 +654,7 @@ add_radio(cJSON *radios, const struct radio *r)
            add_text(radio, "tx", s != NULL ? s->tx_short_name : "") &&
            add_text(radio, "rx", s != NULL ? s->rx_short_name : "") &&
            add_text(radio, "keying", r->have_tr ? oasp_tr_name(r->tr) : "") &&
-           add_buttons(radio, r);
+           add_text(radio, "logger", r->logger) && add_buttons(radio, r);
 }
 
 int
@@ -518,6 +675,10 @@ app_link_snapshot(const struct app_link *l, struct buf *out)
     }
     if (ok && srv != NULL) {
         ok = add_text(root, "server", srv->name);
+    }
+    if (ok && l->notice[0] != '\0') {
+        ok = add_text(root, "notice", l->notice) &&
+             cJSON_AddBoolToObject(root, "refused", l->notice_exit) != NULL;
     }
     ok = ok && add_int(root, "rows", srv != NULL ? srv->rows : l->rows) &&
          add_int(root, "columns", srv != NULL ? srv->columns : l->columns);

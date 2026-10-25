@@ -73,6 +73,14 @@ void oasp_client_destroy(struct oasp_client *client);
 bool oasp_client_is_connected(const struct oasp_client *client);
 
 /*
+ * Makes the pause before the next attempt, should this connection end, at
+ * least ms: for a server that has refused this client, so that it is not
+ * asked again every few seconds.  The usual pauses return once a server
+ * answers again.
+ */
+void oasp_client_retry_later(struct oasp_client *client, uint32_t ms);
+
+/*
  * Sending.  Each queues one message, sent as soon as the socket allows.
  * ERR_CLOSED if not connected (nothing is kept for a later connection), or
  * ERR_LIMIT if CAPS_OASP_SEND_QUEUE bytes are already waiting.
@@ -80,9 +88,12 @@ bool oasp_client_is_connected(const struct oasp_client *client);
 int oasp_client_send_radio(struct oasp_client *client, struct oasp_radio_id id,
                            int khz);
 int oasp_client_send_antenna(struct oasp_client *client,
-                             struct oasp_radio_id id, int antenna, bool tx,
-                             bool rx);
+                             struct oasp_radio_id id, int antenna,
+                             int tx_change, int rx_change);
 int oasp_client_send_function(struct oasp_client *client,
-                              struct oasp_radio_id id, int function);
+                              struct oasp_radio_id id, int function,
+                              int change);
+int oasp_client_send_logger(struct oasp_client *client,
+                            struct oasp_radio_id id, const char *message);
 
 #endif /* MOAS_OASP_CLIENT_H */

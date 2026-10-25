@@ -406,26 +406,48 @@ oasp_client_send_radio(struct oasp_client *c, struct oasp_radio_id id, int khz)
 
 int
 oasp_client_send_antenna(struct oasp_client *c, struct oasp_radio_id id,
-                         int antenna, bool tx, bool rx)
+                         int antenna, int tx_change, int rx_change)
 {
     if (c->state != CONNECTED) {
         return ERR_CLOSED;
     }
     size_t before = c->out.len;
     int sequence = c->sequence + 1;
-    int err = oasp_encode_antenna(&c->out, sequence, id, antenna, tx, rx);
+    int err = oasp_encode_antenna(&c->out, sequence, id, antenna, tx_change,
+                                  rx_change);
     return queue(c, err, before, sequence);
 }
 
 int
 oasp_client_send_function(struct oasp_client *c, struct oasp_radio_id id,
-                          int function)
+                          int function, int change)
 {
     if (c->state != CONNECTED) {
         return ERR_CLOSED;
     }
     size_t before = c->out.len;
     int sequence = c->sequence + 1;
-    int err = oasp_encode_function(&c->out, sequence, id, function);
+    int err = oasp_encode_function(&c->out, sequence, id, function, change);
     return queue(c, err, before, sequence);
+}
+
+int
+oasp_client_send_logger(struct oasp_client *c, struct oasp_radio_id id,
+                        const char *message)
+{
+    if (c->state != CONNECTED) {
+        return ERR_CLOSED;
+    }
+    size_t before = c->out.len;
+    int sequence = c->sequence + 1;
+    int err = oasp_encode_logger(&c->out, sequence, id, message);
+    return queue(c, err, before, sequence);
+}
+
+void
+oasp_client_retry_later(struct oasp_client *c, uint32_t ms)
+{
+    if (ms > c->retry_ms) {
+        c->retry_ms = ms;
+    }
 }

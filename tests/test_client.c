@@ -167,12 +167,19 @@ test_hello_and_sending(void)
 
     /* The messages, in the form the MOAS server expects. */
     CHECK_INT_EQ(oasp_client_send_radio(client, radio, 14000), 0);
-    CHECK_INT_EQ(oasp_client_send_antenna(client, radio, 20, true, true), 0);
-    CHECK_INT_EQ(oasp_client_send_antenna(client, radio, 0, false, true), 0);
+    CHECK_INT_EQ(oasp_client_send_antenna(client, radio, 20,
+                                          OASP_CHANGE_SYSTEM,
+                                          OASP_CHANGE_SYSTEM),
+                 0);
+    CHECK_INT_EQ(oasp_client_send_antenna(client, radio, 0, OASP_CHANGE_NONE,
+                                          OASP_CHANGE_SYSTEM),
+                 0);
     /* Refused, and does not use up a sequence number. */
-    CHECK_INT_EQ(oasp_client_send_antenna(client, radio, 20, false, false),
+    CHECK_INT_EQ(oasp_client_send_antenna(client, radio, 20, OASP_CHANGE_NONE,
+                                          OASP_CHANGE_NONE),
                  ERR_INVALID);
-    CHECK_INT_EQ(oasp_client_send_function(client, radio, 1), 0);
+    CHECK_INT_EQ(
+        oasp_client_send_function(client, radio, 1, OASP_FUNCTION_SELECT), 0);
     const char rest[] =
         "{\"Message\":\"Radio\",\"Sequence\":2,\"Version\":1,\"Parameters\":"
         "{\"Station\":1,\"Radio\":2,\"Frequency\":14000}}"

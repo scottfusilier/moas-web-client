@@ -55,7 +55,9 @@
   }
   .keying:empty { display: none; }
   .keying.transmit { background: var(--tx); border-color: var(--tx); color: var(--panel); }
-  .keying.inhibited { background: var(--warn-bg); border-color: var(--warn-text); color: var(--warn-text); }
+  .keying.inhibited, .keying.unavailable { background: var(--warn-bg); border-color: var(--warn-text); color: var(--warn-text); }
+  .logger { margin: -6px 0 10px; font-size: 13px; color: var(--muted); }
+  .logger:empty { display: none; }
   .sources { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: 13px; color: var(--muted); }
   .sources:empty { display: none; }
   .src::before {
@@ -313,8 +315,26 @@ function makePanel(radio) {
     bands.append(button);
   }
 
-  controls.append(modeGroup, form, bands);
-  root.append(head, panel.sources, using, panel.grid, controls);
+  // Stepping through the band's relative antenna list, and RX = TX.
+  const steps = el("span", "bands");
+  steps.setAttribute("role", "group");
+  steps.setAttribute("aria-label", "Antenna");
+  const step = (label, title, path, body) => {
+    const button = el("button", "", label);
+    button.type = "button";
+    button.title = title;
+    button.addEventListener("click", () => post(path, { ...id, ...body }));
+    steps.append(button);
+  };
+  step("◀ Prev", "The previous antenna in this band's list", "/api/step", { direction: "previous" });
+  step("Next ▶", "The next antenna in this band's list", "/api/step", { direction: "next" });
+  step("RX = TX", "Receive on the transmit antenna", "/api/rx-same-as-tx", {});
+
+  panel.logger = el("div", "logger");
+  panel.logger.setAttribute("role", "status");
+
+  controls.append(modeGroup, form, bands, steps);
+  root.append(head, panel.sources, using, panel.logger, panel.grid, controls);
   document.getElementById("radios").append(root);
   return panel;
 }
@@ -336,12 +356,20 @@ function makeCell(panel, button, enabled) {
   cell.append(el("span", "", button.name));
 
   if (button.kind === "function") {
+    // State 0 is unavailable, 1 available, 2 on (for an on/off function).
     cell.classList.add("fn");
-    if (button.state === 1) cell.classList.add("lit");
-    cell.disabled = !enabled;
+    const on = button.state === 2;
+    if (on) cell.classList.add("lit");
+    if (!button.momentary) cell.setAttribute("aria-pressed", String(on));
+    cell.disabled = !enabled || button.state === 0;
     cell.addEventListener("click", () => post("/api/function", { ...panel.id, function: button.id }));
+    if (button.alternate) {
+      cell.title += " (double-click for its alternate action)";
+      cell.addEventListener("dblclick", () => post("/api/function", { ...panel.id, function: button.id, alternate: true }));
+    }
     return cell;
   }
+  if (button.additive) cell.title += " (adds to what is selected; click again to take it away)";
 
   const txSelected = button.tx === 2, rxSelected = button.rx === 2;
   if (txSelected && rxSelected) cell.classList.add("both");
@@ -367,7 +395,11 @@ function makeCell(panel, button, enabled) {
   return cell;
 }
 
-const KEYING = { transmit: "TRANSMIT", receive: "RECEIVE", inhibited: "INHIBITED" };
+const KEYING = { transmit: "TRANSMIT", receive: "RECEIVE", inhibited: "INHIBITED", unavailable: "TX/RX UNKNOWN" };
+const KEYING_TITLE = {
+  inhibited: "Another radio is transmitting",
+  unavailable: "The switch is not reachable, so the server cannot tell transmit from receive",
+};
 const SOURCE_STATE ={ waiting: "waiting", stale: "no recent reading", error: "not available" };
 
 // updateSources lists the radio's frequency sources, highest priority first,
@@ -397,8 +429,9 @@ function updatePanel(panel, radio, snap) {
   const keying = snap.connected ? radio.keying : "";
   panel.keying.textContent = KEYING[keying] || "";
   panel.keying.className = "keying " + keying;
-  panel.keying.title = keying === "inhibited" ? "Another radio is transmitting" : "";
+  panel.keying.title = KEYING_TITLE[keying] || "";
   panel.root.classList.toggle("transmit", keying === "transmit");
+  panel.logger.textContent = snap.connected && radio.logger ? "Logger: " + radio.logger : "";
   panel.tx.textContent = radio.tx || "none";
   panel.rx.textContent = radio.rx || "none";
   if (radio.frequency > 0 && document.activeElement !== panel.input) panel.input.value = radio.frequency;
@@ -418,6 +451,9 @@ function render() {
   const notice = document.getElementById("notice");
   if (!streamUp) {
     notice.textContent = "Lost contact with the client program. Retrying…";
+  } else if (snapshot && snapshot.refused) {
+    notice.textContent = "The MOAS server at " + snapshot.address + " refused this client" +
+      (snapshot.notice ? ": " + snapshot.notice : "") + ". Asking again in a minute.";
   } else if (snapshot && !snapshot.connected) {
     notice.textContent = "Not connected to the MOAS server at " + snapshot.address +
       (snapshot.error ? " (" + snapshot.error + ")" : "") + ". Retrying…";
@@ -427,6 +463,8 @@ function render() {
       link.addEventListener("click", openSettings);
       notice.append(" ", link);
     }
+  } else if (snapshot && snapshot.notice) {
+    notice.textContent = "Message from the MOAS server: " + snapshot.notice;
   } else {
     notice.textContent = "";
   }

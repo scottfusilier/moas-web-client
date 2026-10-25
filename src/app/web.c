@@ -81,6 +81,12 @@ reply_sent(struct http_reply *reply, int err)
         http_reply_send(reply, 204, NULL, NULL, 0);
     } else if (err == ERR_CLOSED) {
         http_reply_error(reply, 503, "not connected to the MOAS server");
+    } else if (err == ERR_INVALID) {
+        http_reply_error(reply, 400, "the server does not offer that here");
+    } else if (err == ERR_AGAIN) {
+        http_reply_error(reply, 409,
+                         "the server has not said which antenna "
+                         "transmit uses yet");
     } else {
         char message[128];
         snprintf(message, sizeof(message),
@@ -319,7 +325,7 @@ on_function(struct http_reply *reply, const struct http_request *req,
             void *arg)
 {
     static const char *const allowed[] = {"station", "radio", "function",
-                                          NULL};
+                                          "alternate", NULL};
     struct app_web *w = arg;
     cJSON *json = read_body(reply, req, allowed);
     if (json == NULL) {
@@ -327,13 +333,63 @@ on_function(struct http_reply *reply, const struct http_request *req,
     }
     struct oasp_radio_id id;
     int function = 0;
+    bool alternate = false;
     if (get_radio(reply, w, json, &id)) {
-        if (!get_required(json, "function", &function)) {
+        if (!get_required(json, "function", &function) ||
+            json_get_bool(json, "alternate", &alternate) != 0)
+        {
             http_reply_error(reply, 400, "function is required");
         } else {
             reply_sent(reply, app_link_function(app_runner_link(w->runner), id,
-                                                function));
+                                                function, alternate));
         }
+    }
+    cJSON_Delete(json);
+}
+
+/* {station, radio, direction: "next" or "previous"}. */
+static void
+on_step(struct http_reply *reply, const struct http_request *req, void *arg)
+{
+    static const char *const allowed[] = {"station", "radio", "direction",
+                                          NULL};
+    struct app_web *w = arg;
+    cJSON *json = read_body(reply, req, allowed);
+    if (json == NULL) {
+        return;
+    }
+    struct oasp_radio_id id;
+    char direction[16] = "";
+    if (get_radio(reply, w, json, &id)) {
+        json_get_text(json, "direction", direction, sizeof(direction));
+        bool next = strcmp(direction, "next") == 0;
+        if (!next && strcmp(direction, "previous") != 0) {
+            http_reply_error(reply, 400,
+                             "direction must be \"next\" or "
+                             "\"previous\"");
+        } else {
+            reply_sent(reply,
+                       app_link_step(app_runner_link(w->runner), id, next));
+        }
+    }
+    cJSON_Delete(json);
+}
+
+/* {station, radio}: receive on the transmit antenna. */
+static void
+on_rx_same_as_tx(struct http_reply *reply, const struct http_request *req,
+                 void *arg)
+{
+    static const char *const allowed[] = {"station", "radio", NULL};
+    struct app_web *w = arg;
+    cJSON *json = read_body(reply, req, allowed);
+    if (json == NULL) {
+        return;
+    }
+    struct oasp_radio_id id;
+    if (get_radio(reply, w, json, &id)) {
+        reply_sent(reply,
+                   app_link_rx_same_as_tx(app_runner_link(w->runner), id));
     }
     cJSON_Delete(json);
 }
@@ -606,6 +662,8 @@ app_web_create(struct loop *loop, struct app_runner *runner,
         {"POST", "/api/frequency", &small, on_frequency},
         {"POST", "/api/select", &small, on_select},
         {"POST", "/api/function", &small, on_function},
+        {"POST", "/api/step", &small, on_step},
+        {"POST", "/api/rx-same-as-tx", &small, on_rx_same_as_tx},
         {"GET", "/api/settings", &local, on_get_settings},
         {"POST", "/api/settings", &local_settings, on_put_settings},
         {"GET", "/api/n1mm-heard", &local, on_heard},

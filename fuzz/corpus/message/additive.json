@@ -1,0 +1,1 @@
+{"Message":"Configuration","Sequence":3,"Version":1,"Parameters":{"Station":1,"Radio":1,"LowerFrequency":1800,"UpperFrequency":2000,"Antennas":[{"Antenna":50,"ShortName":"Bev-NE","Additive":true,"Row":0,"Column":4}],"Functions":[{"Function":1,"ShortName":"Inhibit","Momentary":false,"Alternate":true,"Row":5,"Column":1}]}}
