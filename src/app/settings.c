@@ -175,7 +175,7 @@ read_radio(const cJSON *json, size_t index, struct app_radio_settings *r,
     if (e != 0) {
         return e;
     }
-    char field[64];
+    char field[80]; /* room for path, ".Sources." and any source number */
     snprintf(field, sizeof(field), "%s.Radio", path);
     r->radio = 0;
     if (json_get_int(json, "Radio", -1000000, 1000000, &r->radio) != 0) {
@@ -210,8 +210,14 @@ read_radio(const cJSON *json, size_t index, struct app_radio_settings *r,
         struct freq_field_error fe;
         e = freq_parse_source(item, r->radio, &r->sources[j], &fe);
         if (e != 0) {
-            snprintf(field, sizeof(field), "%s.Sources.%u%s%s", path,
-                     (unsigned)j, fe.field[0] != '\0' ? "." : "", fe.field);
+            int n = snprintf(field, sizeof(field), "%s.Sources.%u%s%s", path,
+                             (unsigned)j, fe.field[0] != '\0' ? "." : "",
+                             fe.field);
+            if (n < 0 || (size_t)n >= sizeof(field)) {
+                /* Too long to be a real field: point at the source. */
+                snprintf(field, sizeof(field), "%s.Sources.%u", path,
+                         (unsigned)j);
+            }
             return fail(err, field, "radio %d, source %u: %s", r->radio,
                         (unsigned)j + 1, fe.message);
         }

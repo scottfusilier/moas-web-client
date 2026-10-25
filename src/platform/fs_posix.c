@@ -254,8 +254,16 @@ plat_set_read_only(const char *path, bool read_only)
     if (stat(path, &st) != 0) {
         return from_errno(errno);
     }
+    /*
+     * mode_t can be narrower than int (16 bits on FreeBSD), and ~ works in
+     * int, so its result is cast back to mode_t.
+     */
     mode_t mode = st.st_mode & 07777;
-    mode = read_only ? mode & ~(mode_t)0222 : mode | 0200;
+    if (read_only) {
+        mode &= (mode_t) ~(mode_t)0222;
+    } else {
+        mode |= 0200;
+    }
     if (chmod(path, mode) != 0) {
         return from_errno(errno);
     }

@@ -239,8 +239,13 @@ app_runner_save(struct app_runner *r, const struct app_settings *next,
     char current[SHA256_HEX_SIZE];
     int e = app_settings_version(r->path, current);
     if (e != 0) {
-        snprintf(err->message, sizeof(err->message), "cannot read %s: %s",
-                 r->path, err_str(e));
+        int n = snprintf(err->message, sizeof(err->message),
+                         "cannot read %s: %s", r->path, err_str(e));
+        if (n < 0 || (size_t)n >= sizeof(err->message)) {
+            /* A path too long to show is left out, not cut off. */
+            snprintf(err->message, sizeof(err->message),
+                     "cannot read the settings file: %s", err_str(e));
+        }
         return e;
     }
     if (strcmp(current, version != NULL ? version : "") != 0) {

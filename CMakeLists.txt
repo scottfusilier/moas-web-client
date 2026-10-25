@@ -33,6 +33,7 @@ include(platform)
 include(warnings)
 include(hardening)
 include(sanitizers)
+include(strip)
 include(format)
 
 add_subdirectory(third_party)

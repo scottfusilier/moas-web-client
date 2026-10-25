@@ -73,9 +73,9 @@ Tests link only the layers they need.
 moas-web-client/
 ├── CMakeLists.txt, CMakePresets.json
 ├── LICENSE, README.md, CHANGELOG.md, CONTRIBUTING.md
-├── moas-web-client.example.json           an example settings file with every setting
+├── moas-web-client.example.json   an example settings file with every setting
 ├── .editorconfig, .clang-format, .gitattributes, .gitignore
-├── cmake/   platform  warnings  hardening  sanitizers  format  check_banned  embed (.cmake)
+├── cmake/   platform  warnings  hardening  sanitizers  strip  format  check_banned  embed (.cmake)
 ├── scripts/ check.sh, check.bat   build and test every preset, check formatting
 │            fuzz.sh               build with libFuzzer and fuzz each target (Unix)
 ├── src/

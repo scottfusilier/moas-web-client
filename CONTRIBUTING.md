@@ -105,7 +105,7 @@ cannot build here on its own.  `scripts\check.bat` sets this up itself.
 | Preset    | What it builds |
 |-----------|----------------|
 | `debug`   | Debug build: no optimisation, debug information |
-| `release` | Optimised build, with `_FORTIFY_SOURCE` where available |
+| `release` | Optimised build, with `_FORTIFY_SOURCE` where available, without the symbol table |
 | `asan`    | Debug build with AddressSanitizer and UndefinedBehaviorSanitizer |
 | `fuzz`    | The fuzz targets with libFuzzer and the sanitizers (clang, FreeBSD and Linux) |
 
