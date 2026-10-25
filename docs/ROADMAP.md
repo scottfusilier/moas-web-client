@@ -1,9 +1,8 @@
 # moas-web-client roadmap
 
-This is the plan for moas-web-client, the C version of moasweb, which
-replaces the earlier Go version.  The project is moas-web-client; the
-program it builds is `moasweb`.  The Go version is the reference until this
-one matches it; after that it is retired.
+This is the plan for moas-web-client, a web client for the MOAS antenna
+switch server, written in C.  The project and the program it builds are
+both called `moas-web-client`.
 
 ## Decisions
 
@@ -16,9 +15,9 @@ one matches it; after that it is retired.
   closer to complete, it is built and tested on Windows, FreeBSD and Linux;
   macOS and MSVC come later.  Ninja is the build tool on every system, so
   the presets and check script are the same everywhere.
-* Developed locally, with no hosting service assumed.  Checks run from a
-  script (`scripts/check.sh`, `scripts\check.bat`) rather than a hosted
-  service.
+* Kept in a private GitHub repository, with no hosted services in use.
+  Checks run from a script (`scripts/check.sh`, `scripts\check.bat`) on the
+  maintainer's machines, not in hosted CI.
 * Licensed BSD-2-Clause.
 * Code layout follows PEP 7: 4-space indents, no tabs, braces always,
   declarations where first used, return type on its own line, 79-column
@@ -48,7 +47,7 @@ one matches it; after that it is retired.
 ## Layers
 
 ```
-                 app/  (moasweb)
+                 app/  (moas-web-client)
                    │
        ┌───────────┼────────────┐
        ▼           ▼            ▼
@@ -74,7 +73,7 @@ Tests link only the layers they need.
 moas-web-client/
 ├── CMakeLists.txt, CMakePresets.json
 ├── LICENSE, README.md, CHANGELOG.md, CONTRIBUTING.md
-├── moasweb.example.json           an example settings file with every setting
+├── moas-web-client.example.json           an example settings file with every setting
 ├── .editorconfig, .clang-format, .gitattributes, .gitignore
 ├── cmake/   platform  warnings  hardening  sanitizers  format  check_banned  embed (.cmake)
 ├── scripts/ check.sh, check.bat   build and test every preset, check formatting
@@ -117,7 +116,7 @@ moas-web-client/
 │   │   ├── guard.c                Host, Origin, Content-Type and local-only checks
 │   │   └── server.c               connections, responses with security headers,
 │   │                              replies sent later, server-sent events, limits
-│   └── app/                       prefix app_; moasweb
+│   └── app/                       prefix app_; moas-web-client
 │       ├── main.c                 the command line, then web mode or watch mode
 │       ├── args.h, args.c         command line; which options were given
 │       ├── serve.h, serve.c       web mode: startup settings, start, Ctrl+C, shutdown
@@ -134,7 +133,7 @@ moas-web-client/
 │   ├── oasp_samples.h             sample server messages shared by tests and corpus
 │   ├── fake_rig.c/.h              rigctld stand-in on loopback, same event loop
 │   ├── http_client.c/.h           a small HTTP client on the same event loop
-│   └── test_<module>.c            one per module; test_web.c runs moasweb end to end
+│   └── test_<module>.c            one per module; test_web.c runs moas-web-client end to end
 ├── fuzz/
 │   ├── fuzz.h                     the entry point every target defines
 │   ├── fuzz_frame.c  fuzz_message.c  fuzz_n1mm_xml.c  fuzz_rigctld_reply.c
@@ -149,8 +148,8 @@ moas-web-client/
 Parsing of outside input is always in its own file with no I/O, so that each
 parser can be fuzzed alone and the risky code is easy to find.
 
-Web routes match the Go version, so `page.html` is unchanged: `GET /`,
-`GET /events`, `GET /api/state`, `POST /api/frequency`, `POST /api/select`,
+The web routes, which `page.html` uses: `GET /`, `GET /events`,
+`GET /api/state`, `POST /api/frequency`, `POST /api/select`,
 `POST /api/function`, and, local only, `GET` and `POST /api/settings`,
 `GET /api/n1mm-heard` and `POST /api/rigctld-test`.
 
@@ -179,7 +178,7 @@ Web routes match the Go version, so `page.html` is unchanged: `GET /`,
   available, otherwise `SIGPIPE` ignored).  Feature macros are set so that
   each system's headers declare what is used (`_POSIX_C_SOURCE`, plus
   `_DARWIN_C_SOURCE` on macOS).  The macOS settings folder is
-  `~/Library/Application Support/moasweb/`.
+  `~/Library/Application Support/moas-web-client/`.
 * Frequency source types are added by writing one file and one registry line;
   each type checks its own settings.
 
@@ -191,8 +190,8 @@ under the sanitizers, and the formatting is clean.  Fuzz targets are run on
 FreeBSD.  The maintainer runs the FreeBSD and Linux checks.
 
 Each stage comes with a short summary: what is in it, where to start
-reading, and anything uncertain.  It is reviewed and committed to the local
-repository before the next stage starts.  A stage is roughly 500 to 1,500
+reading, and anything uncertain.  It is reviewed and committed before the
+next stage starts.  A stage is roughly 500 to 1,500
 lines.
 
 ## Stage 0: foundations
@@ -267,31 +266,27 @@ As built, Stage 1 differs from the plan in a few ways:
   the client's messages encoded.
 * Client: connect, Hello and reconnect with back-off, non-blocking on the
   event loop.
-* Tests from the Go version's sample messages, and a fake MOAS server in
+* Tests from sample server messages, and a fake MOAS server in
   `tests/` that later stages reuse.  Fuzz targets for the framer and decoder,
   with the `fuzz` preset, a replay program that runs the stored inputs as
   tests where libFuzzer is not available (Windows), and fuzzing runs on
   FreeBSD.
-* `moasweb -watch`, with a first version of `app/main.c` and `app/args.c`:
-  connects as the given station and radio and prints everything the server
-  sends, including TR changes.  It is read-only: it sends only Hello, never
-  a frequency (which can switch relays), an antenna selection or a function.
-  A radio whose frequency the server does not know yet gets no
-  configuration, and watch mode says so.  It stays in moasweb as a
-  troubleshooting aid.  First milestone: it runs against a `--sim` server
-  and the real switch.
-
-The Go version's separate `moasctl` tool is not carried over; its read-only
-part lives on as `-watch`.
+* `moas-web-client -watch`, with a first version of `app/main.c` and
+  `app/args.c`: connects as the given station and radio and prints
+  everything the server sends, including TR changes.  It is read-only: it
+  sends only Hello, never a frequency (which can switch relays), an
+  antenna selection or a function.  A radio whose frequency the server
+  does not know yet gets no configuration, and watch mode says so.  It
+  stays in moas-web-client as a troubleshooting aid.  First milestone: it
+  runs against a `--sim` server and the real switch.
 
 As built, Stage 2 differs from the plan, or adds to it, in these ways:
 
 * A message that cannot be decoded is logged and skipped, and the
   connection carries on.  Only a stream that can no longer be split into
   messages (text that is not an object, unbalanced brackets, a message over
-  `CAPS_OASP_MESSAGE`) drops the connection.  The Go version dropped it for
-  any malformed JSON.
-* Reconnecting starts at the Go version's 2 seconds and doubles up to 30
+  `CAPS_OASP_MESSAGE`) drops the connection.
+* Reconnecting starts at 2 seconds and doubles up to 30
   seconds while the server stays unreachable, returning to 2 seconds once
   it answers: gentler on a server that has trouble with repeated
   connections.
@@ -316,32 +311,30 @@ As built, Stage 2 differs from the plan, or adds to it, in these ways:
 
 * `freq/source.h`: the operations every source type provides, and the
   registry that maps a type name such as `"n1mm"` to them.
-* `freq/tracker`: per-radio priority and failover, with the Go version's
-  rules.
+* `freq/tracker`: per-radio priority and failover.
 * `freq/n1mm`: UDP listener and a strict reader for the XML tags used.
   Fuzzed.
 * `freq/rigctld`: poller and reply parser.  Fuzzed.
 * `docs/adding-a-frequency-source.md`, using rigctld as the example.
-* Tests ported from the Go `freq` tests, on loopback sockets.
+* Tests on loopback sockets.
 
 As built, Stage 3 differs from the plan, or adds to it, in these ways:
 
 * Each source type reads its own settings straight from the JSON of its
   entry in a radio's `"Sources"`, so a new type can have settings of its
   own without changing any shared struct.  Unknown settings are refused,
-  and the error messages follow the Go version's ("PollMilliseconds does
-  not apply to n1mm").  Addresses must be numeric, as everywhere else.
+  and the error messages name the setting ("PollMilliseconds does not
+  apply to n1mm").  Addresses must be numeric, as everywhere else.
 * The manual override (a typed frequency holds until the radio is tuned)
-  stays in the app, as in the Go version, where it is part of passing
-  frequencies to the server; it comes with Stage 5.  The tracker itself
-  follows the Go `freq.Tracker` exactly.
+  stays in the app, where it is part of passing frequencies to the
+  server; it comes with Stage 5.
 * The tracker checks for stale readings itself, four times a second, on
   the event loop; tests replace its clock.
 * N1MM's "radios heard" list and rigctld's one-off Test, both for the
   settings page, are here already.
 * N1MM station names longer than CAPS_N1MM_STATION are cut short, and
   readings must be between 1 kHz and 1 THz.
-* Not yet tried against a real N1MM or rigctld: nothing in moasweb uses
+* Not yet tried against a real N1MM or rigctld: nothing in moas-web-client uses
   the sources until Stage 5 wires them up.
 
 ## Stage 4: HTTP server
@@ -363,7 +356,7 @@ As built, Stage 4 differs from the plan, or adds to it, in these ways:
   rigctld).  If the browser goes first, the handler's cancel callback runs,
   so it can stop what it started.  Cancel callbacks, like handlers, only run
   from the event loop, never inside a call the app makes.
-* The guard follows the Go version: when the page is served on a loopback
+* The guard: when the page is served on a loopback
   address only, the `Host` must be a loopback name (against DNS
   rebinding); a POST must come from the page's own origin, if the browser
   says, and be `application/json`; local-only routes refuse other
@@ -381,31 +374,30 @@ As built, Stage 4 differs from the plan, or adds to it, in these ways:
   live-update streams, and 1 MiB waiting for any one browser before it is
   dropped.
 
-## Stage 5: moasweb
+## Stage 5: moas-web-client
 
-* Settings: the Go version's JSON format, `"Version"` and `"_comment"`
-  handling, lookup order, per-field validation errors, saving in one step,
-  refusing read-only files, and starting on defaults when the file is
-  missing or broken.
-* `page.html` embedded by CMake and unchanged; the web addresses and JSON
-  replies match the Go version.
+* Settings: a JSON format with `"Version"` and `"_comment"` handling,
+  lookup order, per-field validation errors, saving in one step, refusing
+  read-only files, and starting on defaults when the file is missing or
+  broken.
+* `page.html` embedded by CMake.
 * Wiring: server link, tracker, and settings applied live on Save.
-* Tests: the scenarios of the Go `web_test`, `settings_test` and
-  `follow_test`.
+* Tests: the page driving the server, refused requests, reconnecting, live
+  updates, the follower, and the settings file.
 
 As built, Stage 5 differs from the plan, or adds to it, in these ways:
 
-* The settings file is found as in the Go version: the `-config` file if
-  given; else `moasweb.json` beside the program, if there is one; else
-  `moasweb/moasweb.json` in the settings folder.  On Unix "beside the
-  program" works only when it was started by a path, not found on the
-  `PATH`.
+* The settings file is the `-config` file if given; else
+  `moas-web-client.json` beside the program, if there is one; else
+  `moas-web-client/moas-web-client.json` in the settings folder.  On Unix
+  "beside the program" works only when it was started by a path, not found
+  on the `PATH`.
 * A file's version is the SHA-256 of its contents.  The page sends back the
   version it was shown; if the file has changed since, the save is refused
   (409) rather than overwriting someone's hand edit.
 * Saving refuses a file that is read-only for this user, with a message
   saying so, even on Unix where the folder would allow replacing it.
-* A file with a mistake never stops moasweb starting: it prints the
+* A file with a mistake never stops moas-web-client starting: it prints the
   problem, runs on the defaults and leaves the file alone.  The page's
   settings section shows as much of the file as could be read, with the
   mistake marked.
@@ -424,10 +416,10 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
   messages from the server makes one update.
 * The page's `Content-Security-Policy` allows only its own inline script
   and style, by SHA-256 hash, computed at startup from the embedded page.
-* Tests run moasweb end to end on loopback ports chosen by the system: the
-  page's requests go through the runner and the link to a fake MOAS server,
-  and the follower is tested with real N1MM (UDP) and rigctld (TCP)
-  sources.  `fuzz_settings` checks that any accepted file reads back the
+* Tests run the program end to end on loopback ports chosen by the
+  system: the page's requests go through the runner and the link to a fake
+  MOAS server, and the follower is tested with real N1MM (UDP) and rigctld
+  (TCP) sources.  `fuzz_settings` checks that any accepted file reads back the
   same after being written, and that a refused one changes nothing.
 * Still to be tried by hand, as part of Stage 6's checklist: the page in
   browsers, against the real switch, and with a real N1MM and rigctld.
@@ -435,14 +427,14 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
   on a port other than 12059, so that a real server on this computer is
   never reached by mistake.
 
-## Stage 6: parity, packaging, 1.0
+## Stage 6: trial, packaging, 1.0
 
-* Run alongside the Go version against a `--sim` server and the real switch,
-  using a checklist of every Go feature.
+* Try every feature from a checklist against a `--sim` server and the real
+  switch.
 * CPack packages (`.zip` for Windows, `.tar.gz` elsewhere), with checksums.
 * Build and test on macOS, and with MSVC, before 1.0.
 * User guide, `docs/architecture.md` and protocol notes.
-* Release v1.0.0 and archive the Go repository with a pointer here.
+* Release v1.0.0.
 
 ## Later
 
@@ -464,5 +456,4 @@ only Linux checks is memory leaks: LeakSanitizer runs by default only
 there.  Run `scripts/check.sh` on Linux before Stage 6 starts, and fix
 anything it finds then.
 
-The maintainer keeps the git repository locally and decides later where, if
-anywhere, it is published.
+The repository is private on GitHub.

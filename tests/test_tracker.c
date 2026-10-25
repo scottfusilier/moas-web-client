@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Scott Fusilier
  */
 
-/* Choosing between a radio's sources: the Go version's rules. */
+/* Choosing between a radio's sources. */
 
 #include "core/common.h"
 

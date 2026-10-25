@@ -1,10 +1,10 @@
 # Adding a frequency source
 
-A frequency source is a program that can tell moasweb a radio's frequency:
-N1MM Logger+ and hamlib's rigctld so far.  Each kind of source is a *type*.
-Adding one means writing one file and adding one line to
+A frequency source is a program that can tell moas-web-client a radio's
+frequency: N1MM Logger+ and hamlib's rigctld so far.  Each kind of source
+is a *type*.  Adding one means writing one file and adding one line to
 `src/freq/registry.c`; the tracker, the settings code and the rest of
-moasweb do not change.  This guide uses the rigctld type
+moas-web-client do not change.  This guide uses the rigctld type
 (`src/freq/rigctld.c`) as the example.
 
 ## How sources fit in
@@ -71,8 +71,8 @@ If `parse` fails after allocating `config->data`, leave it there:
 
 Then write `write`, the other way round: it puts your settings back into a
 JSON object, which already holds `"Type"`, with the defaults filled in.
-moasweb uses it to save the settings file and to show the settings on the
-page, so whatever `write` produces must read back through `parse` as the
+moas-web-client uses it to save the settings file and to show the settings
+on the page, so whatever `write` produces must read back through `parse` as the
 same settings (the `fuzz_settings` target checks this):
 
 ```c
@@ -186,4 +186,5 @@ message, and that `write` reads back the same), and the running source
 against a stand-in for the real program on the loopback interface, on the
 same event loop.  `tests/test_rigctld.c` does all of this, with the
 stand-in in `tests/fake_rig.c`.  Add a sample settings file using your type
-to `fuzz/corpus/settings/`.  Then run `scripts/check.sh` (or `scripts\check.bat`).
+to `fuzz/corpus/settings/`.  Then run `scripts/check.sh` (or
+`scripts\check.bat`).

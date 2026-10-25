@@ -20,7 +20,8 @@
  *
  * This header has the message types, decoding and encoding; oasp/frame.h
  * splits the byte stream into messages and oasp/client.h runs a connection.
- * None of it depends on the rest of moasweb, so it can be used on its own.
+ * None of it depends on the rest of moas-web-client, so it can be used on its
+ * own.
  */
 
 #ifndef MOAS_OASP_OASP_H
@@ -49,7 +50,7 @@ struct oasp_radio_id {
  * configuration and reports the size it chose in its Server message.
  */
 struct oasp_hello {
-    const char *name; /* this client's name, such as "moasweb" */
+    const char *name; /* this client's name, such as "moas-web-client" */
     bool bidirectional;
     bool indicate_tr; /* ask for TR messages (sent only if true) */
     const struct oasp_radio_id *radios;

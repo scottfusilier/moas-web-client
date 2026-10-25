@@ -4,7 +4,7 @@
  */
 
 /*
- * A small HTTP/1.1 server for moasweb's page, run by the event loop.
+ * A small HTTP/1.1 server for moas-web-client's page, run by the event loop.
  *
  * It serves exactly the routes it is given, checks every request against
  * the rules in guard.c before a handler sees it, and keeps every size and
@@ -61,7 +61,7 @@ int http_reply_header(struct http_reply *reply, const char *name,
 int http_reply_send(struct http_reply *reply, int status,
                     const char *content_type, const void *body, size_t len);
 
-/* Sends a plain-text error message, as the Go version's http.Error. */
+/* Sends a plain-text error message. */
 int http_reply_error(struct http_reply *reply, int status,
                      const char *message);
 

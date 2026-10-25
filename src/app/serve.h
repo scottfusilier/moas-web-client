@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Scott Fusilier
  */
 
-/* Running moasweb for the command line: the page, or watch mode. */
+/* Running moas-web-client for the command line: the page, or watch mode. */
 
 #ifndef MOAS_APP_SERVE_H
 #define MOAS_APP_SERVE_H

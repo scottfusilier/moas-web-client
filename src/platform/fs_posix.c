@@ -266,9 +266,10 @@ int
 plat_exe_dir(const char *argv0, char *out, size_t size)
 {
     /*
-     * A program started by a path ("./moasweb", "/usr/local/bin/moasweb")
-     * is in that path's folder.  One found on the PATH cannot be placed
-     * without system-specific calls; then there is no such folder to use.
+     * A program started by a path ("./moas-web-client",
+     * "/usr/local/bin/moas-web-client") is in that path's folder.  One found
+     * on the PATH cannot be placed without system-specific calls; then there
+     * is no such folder to use.
      */
     const char *slash = argv0 != NULL ? strrchr(argv0, '/') : NULL;
     if (slash == NULL) {

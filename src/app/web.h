@@ -5,8 +5,7 @@
 
 /*
  * The page and the requests it makes, served by the HTTP server.  The
- * routes, request bodies and replies are the Go version's, so that the page
- * works unchanged:
+ * routes, request bodies and replies are the ones page.html uses:
  *
  *   GET  /                     the page
  *   GET  /events               a snapshot now and after every change

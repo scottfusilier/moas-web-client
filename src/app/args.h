@@ -4,9 +4,9 @@
  */
 
 /*
- * moasweb's command line.  Options look like the Go version's: -name value
- * or -name=value, and --name works the same.  A yes/no option is turned on
- * by naming it (-watch), or set with -watch=true or -watch=false.
+ * moas-web-client's command line.  Options look like -name value or
+ * -name=value, and --name works the same.  A yes/no option is turned on by
+ * naming it (-watch), or set with -watch=true or -watch=false.
  *
  * Options given on the command line win over the settings file; which ones
  * were given is recorded, so the page can say so.

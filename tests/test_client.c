@@ -165,7 +165,7 @@ test_hello_and_sending(void)
     struct str got = fake_server_received(server);
     CHECK_MEM_EQ(got.ptr, got.len, HELLO_TEST);
 
-    /* The same messages, in the same form, as the Go client sends. */
+    /* The messages, in the form the MOAS server expects. */
     CHECK_INT_EQ(oasp_client_send_radio(client, radio, 14000), 0);
     CHECK_INT_EQ(oasp_client_send_antenna(client, radio, 20, true, true), 0);
     CHECK_INT_EQ(oasp_client_send_antenna(client, radio, 0, false, true), 0);

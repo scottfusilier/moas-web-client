@@ -9,4 +9,4 @@
 .DS_Store
 
 # A local settings file used while testing
-moasweb.json
+moas-web-client.json

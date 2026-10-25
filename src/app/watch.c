@@ -334,7 +334,7 @@ app_watch_create(struct loop *loop, const struct app_watch_options *options,
         .server = options->server,
         .hello =
             {
-                .name = "moasweb",
+                .name = "moas-web-client",
                 .bidirectional = true,
                 .indicate_tr = true,
                 .radios = &w->options.radio,
@@ -401,7 +401,7 @@ app_watch_run(const struct app_args *args)
         0)
     {
         fprintf(stderr,
-                "moasweb: \"%s\" is not a server address; give it as "
+                "moas-web-client: \"%s\" is not a server address; give it as "
                 "host:port with a numeric host, for example "
                 "192.168.1.10:12059\n",
                 args->server);

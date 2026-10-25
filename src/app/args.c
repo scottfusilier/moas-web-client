@@ -46,17 +46,18 @@ _Static_assert(ARRAY_LEN(options) == APP_OPT_COUNT,
 const char *
 app_args_usage(void)
 {
-    return "Usage: moasweb [options]\n"
+    return "Usage: moas-web-client [options]\n"
            "\n"
            "Serves a page with the MOAS server's antenna buttons; open the "
            "address it\n"
            "prints in a browser.  Options given here win over the settings "
            "file.\n"
            "\n"
-           "  -config FILE      the settings file; without it, moasweb.json "
-           "beside the\n"
-           "                    program if there is one, else in your "
-           "settings folder\n"
+           "  -config FILE      the settings file; without it, "
+           "moas-web-client.json\n"
+           "                    beside the program if there is one, else "
+           "in your\n"
+           "                    settings folder\n"
            "  -server ADDRESS   the MOAS server, for example "
            "192.168.1.10:12059\n"
            "  -listen ADDRESS   where to serve the page (default "

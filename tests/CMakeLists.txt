@@ -43,11 +43,11 @@ moas_test(rigctld LIBS moas_freq SOURCES fake_rig.c)
 moas_test(http_parse LIBS moas_http)
 moas_test(http_server LIBS moas_http)
 
-# moasweb.
+# moas-web-client.
 moas_test(args LIBS moas_app)
 moas_test(settings LIBS moas_app)
 target_compile_definitions(test_settings PRIVATE
-    EXAMPLE_SETTINGS="${PROJECT_SOURCE_DIR}/moasweb.example.json")
+    EXAMPLE_SETTINGS="${PROJECT_SOURCE_DIR}/moas-web-client.example.json")
 moas_test(watch LIBS moas_app SOURCES fake_moas_server.c)
 moas_test(web LIBS moas_app
     SOURCES fake_moas_server.c fake_rig.c http_client.c)

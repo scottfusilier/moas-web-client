@@ -4,8 +4,8 @@
  */
 
 /*
- * moasweb from end to end: the page's requests, through the runner and the
- * link, to a fake MOAS server, all on loopback ports chosen by the system.
+ * moas-web-client from end to end: the page's requests, through the runner and
+ * the link, to a fake MOAS server, all on loopback ports chosen by the system.
  * The fake behaves enough like a MOAS server to drive the link: it answers
  * Hello, sends a Configuration and State when a frequency is reported, and
  * a new State when an antenna is selected.  Antenna 12 can transmit;
@@ -373,7 +373,8 @@ start_loop(void)
     return ok;
 }
 
-/* Then moasweb itself; radio is the Radios entry (NULL: just radio 1). */
+/* Then moas-web-client itself; radio is the Radios entry (NULL: just radio 1).
+ */
 static bool
 start_app(const char *radio)
 {

@@ -5,7 +5,7 @@
 
 /*
  * Sample messages in the form MOAS Server v2.0.2 sends them, shortened,
- * with generic antenna names.  The same samples as the Go version's tests.
+ * with generic antenna names.
  */
 
 #ifndef MOAS_TESTS_OASP_SAMPLES_H

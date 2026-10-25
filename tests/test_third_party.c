@@ -5,7 +5,7 @@
 
 /*
  * Checks that the vendored libraries build and work on this system, using
- * input shaped like what moasweb will give them.
+ * input shaped like what moas-web-client will give them.
  */
 
 #include <string.h>

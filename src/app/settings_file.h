@@ -12,14 +12,15 @@
 #include "core/caps.h"
 #include "core/sha256.h"
 
-#define APP_SETTINGS_FILE_NAME "moasweb.json"
+#define APP_SETTINGS_FILE_NAME "moas-web-client.json"
 
 /*
- * Which settings file to use: config if given (-config); else moasweb.json
- * in the program's folder, if there is one there (handy for a folder on a
- * USB stick); else moasweb.json in the user's settings folder, such as
- * ~/.config/moasweb/ or %AppData%\moasweb\, where a new file is created.
- * The same on every system.
+ * Which settings file to use: config if given (-config); else
+ * moas-web-client.json in the program's folder, if there is one there (handy
+ * for a folder on a USB stick); else moas-web-client.json in the user's
+ * settings folder, such as
+ * ~/.config/moas-web-client/ or %AppData%\moas-web-client\, where a new file
+ * is created. The same on every system.
  */
 int app_settings_find(const char *config, const char *argv0, char *out,
                       size_t size);

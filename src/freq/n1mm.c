@@ -386,7 +386,7 @@ n1mm_free_data(void *data)
     free(data);
 }
 
-/* As the Go version saves it: StationName and TimeoutSeconds only if set. */
+/* StationName and TimeoutSeconds are written only if set. */
 static int
 n1mm_write(const struct freq_source_config *config, cJSON *obj)
 {

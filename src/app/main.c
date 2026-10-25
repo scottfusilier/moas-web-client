@@ -4,9 +4,9 @@
  */
 
 /*
- * moasweb: a client for the MOAS II antenna switch server, with its buttons
- * in a web page.  It connects to a MOAS server for one or more radios and
- * serves a page that shows the server's button grid and sends clicks back.
+ * moas-web-client: a client for the MOAS II antenna switch server, with its
+ * buttons in a web page.  It connects to a MOAS server for one or more radios
+ * and serves a page that shows the server's button grid and sends clicks back.
  *
  * Each radio's frequency can come from N1MM Logger+ or hamlib's rigctld, as
  * set in the settings file, or be typed on the page.
@@ -30,14 +30,16 @@ int
 main(int argc, char **argv)
 {
     if (plat_process_init(&argc, &argv) != 0) {
-        fprintf(stderr, "moasweb: cannot read the command line\n");
+        fprintf(stderr, "moas-web-client: cannot read the command line\n");
         return 1;
     }
 
     struct app_args args;
     char error[256];
     if (app_args_parse(argc, argv, &args, error, sizeof(error)) != 0) {
-        fprintf(stderr, "moasweb: %s\nRun moasweb -help for the options.\n",
+        fprintf(stderr,
+                "moas-web-client: %s\nRun moas-web-client -help for the "
+                "options.\n",
                 error);
         return 2;
     }
@@ -46,7 +48,7 @@ main(int argc, char **argv)
         return 0;
     }
     if (args.version) {
-        printf("moasweb %s\n", MOAS_VERSION);
+        printf("moas-web-client %s\n", MOAS_VERSION);
         return 0;
     }
     if (!args.watch) {

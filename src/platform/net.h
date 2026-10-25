@@ -75,7 +75,7 @@ int plat_tcp_connect(const struct plat_addr *addr, plat_socket *out);
 /*
  * Listens on addr.  On Windows no other program can take over the port
  * while it is in use; on Unix the port can be reused at once after
- * moasweb stops.
+ * moas-web-client stops.
  */
 int plat_tcp_listen(const struct plat_addr *addr, plat_socket *out);
 

@@ -21,7 +21,7 @@
 /* The largest snapshot sent (a station with many radios and buttons). */
 #define SNAPSHOT_MAX (512 * 1024)
 
-/* Body limits, as in the Go version. */
+/* Body limits. */
 #define BODY_SMALL 4096
 #define BODY_SETTINGS (64 * 1024)
 
@@ -29,7 +29,7 @@
 #define MAX_KHZ 500000
 
 #define LOCAL_ONLY_MESSAGE                                                    \
-    "settings can only be changed on the computer moasweb runs on"
+    "settings can only be changed on the computer moas-web-client runs on"
 
 struct app_web {
     struct loop *loop;
@@ -60,7 +60,7 @@ reply_json(struct http_reply *reply, int status, cJSON *json)
     cJSON_Delete(json);
 }
 
-/* A FieldError, as the Go version wrote it: {"Field": ..., "Message": ...}. */
+/* A field error, as the page expects it: {"Field": ..., "Message": ...}. */
 static void
 reply_field_error(struct http_reply *reply, int status, const char *field,
                   const char *message)
@@ -367,7 +367,7 @@ on_get_settings(struct http_reply *reply, const struct http_request *req,
         have_problem = true;
         app_settings_fini(&shown);
         app_settings_copy(&shown, app_runner_settings(w->runner));
-        /* As much of the file as could be read, as the Go version showed. */
+        /* As much of the file as could be read. */
         app_settings_load_partial(path, &shown);
     }
 

@@ -153,7 +153,8 @@ app_serve(const struct app_args *args, const char *argv0)
 {
     char path[CAPS_PATH];
     if (app_settings_find(args->config, argv0, path, sizeof(path)) != 0) {
-        fprintf(stderr, "moasweb: the settings file's path is too long\n");
+        fprintf(stderr,
+                "moas-web-client: the settings file's path is too long\n");
         return 2;
     }
     struct app_settings settings;
@@ -161,7 +162,7 @@ app_serve(const struct app_args *args, const char *argv0)
     if (app_startup_settings(path, args, false, &settings, message,
                              sizeof(message)) != 0)
     {
-        fprintf(stderr, "moasweb: %s\n", message);
+        fprintf(stderr, "moas-web-client: %s\n", message);
         app_settings_fini(&settings);
         return 2;
     }
@@ -216,7 +217,7 @@ app_serve(const struct app_args *args, const char *argv0)
     };
     err = app_web_create(loop, runner, &web_options, &serving.web);
     if (err != 0) {
-        fprintf(stderr, "moasweb: cannot serve the page at %s: %s\n",
+        fprintf(stderr, "moas-web-client: cannot serve the page at %s: %s\n",
                 settings.listen, err_str(err));
         goto out;
     }

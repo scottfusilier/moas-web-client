@@ -6,16 +6,99 @@ plan and the reasons behind the main decisions.
 
 ## Building
 
-You need CMake 3.21 or later, Ninja, and a C11 compiler.  For now the
+You need git, CMake 3.21 or later, Ninja, and a C11 compiler.  For now the
 project is built and tested on Windows, FreeBSD and Linux.  It is written to
 run on macOS too, and the build files have MSVC settings, but those are not
 tested yet.  Ninja is the build tool everywhere.
 
-| System  | Installing the tools |
-|---------|----------------------|
-| FreeBSD | `pkg install cmake ninja` (clang is part of the base system) |
-| Linux   | Debian and Ubuntu: `apt install build-essential cmake ninja-build`; Fedora: `dnf install gcc cmake ninja-build libasan libubsan`.  The check script uses `cc`, which is gcc on most distributions; that also gives the project a second compiler family. |
-| Windows | [MSYS2](https://www.msys2.org) CLANG64: `pacman -S mingw-w64-clang-x86_64-toolchain mingw-w64-clang-x86_64-ninja`, plus CMake, from MSYS2 (`mingw-w64-clang-x86_64-cmake`) or from cmake.org. Work in the MSYS2 CLANG64 shell, or put `C:\msys64\clang64\bin` first on `PATH`. |
+Each system below goes from nothing to a built and tested program.  Use the
+`release` build to run moas-web-client; the others are for working on the code.
+
+### FreeBSD
+
+```sh
+pkg install git cmake ninja        # as root; clang is in the base system
+git clone https://github.com/scottfusilier/moas-web-client.git
+cd moas-web-client
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
+```
+
+The program is `build/release/src/app/moas-web-client`.
+
+### Linux
+
+Debian and Ubuntu:
+
+```sh
+sudo apt install git build-essential cmake ninja-build
+```
+
+Fedora: `sudo dnf install git gcc cmake ninja-build libasan libubsan`.
+
+Then, as on FreeBSD:
+
+```sh
+git clone https://github.com/scottfusilier/moas-web-client.git
+cd moas-web-client
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
+```
+
+The program is `build/release/src/app/moas-web-client`.  CMake uses `cc`,
+which is gcc on most distributions; that also gives the project a second
+compiler family.  For fuzzing, also install clang (`apt install clang`, and
+`libclang-rt-dev` if linking fails).
+
+### Windows
+
+1. Install [MSYS2](https://www.msys2.org) in `C:\msys64`.
+2. Open the **MSYS2 CLANG64** shell from the Start menu and install the
+   tools:
+
+   ```sh
+   pacman -S git mingw-w64-clang-x86_64-toolchain \
+       mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja
+   ```
+
+3. In the same shell, build and test:
+
+   ```sh
+   git clone https://github.com/scottfusilier/moas-web-client.git
+   cd moas-web-client
+   cmake --preset release
+   cmake --build --preset release
+   ctest --preset release
+   ```
+
+The program is `build\release\src\app\moas-web-client.exe`.  It needs only what
+comes with Windows 10 and later, so it can be copied to another computer
+and run there without MSYS2.
+
+To build from PowerShell instead, put MSYS2's tools first on `PATH` and name
+the compiler, for that window only:
+
+```powershell
+$env:PATH = "C:\msys64\clang64\bin;$env:PATH"
+$env:CC = "clang"
+cmake --preset release
+```
+
+Naming the compiler matters if another clang is installed, such as LLVM's
+own in `C:\Program Files\LLVM`: CMake could find that one first, and it
+cannot build here on its own.  `scripts\check.bat` sets this up itself.
+
+### Optional tools
+
+* **clang-format** (version 23 is the reference) for the formatting check;
+  without it, the check scripts skip formatting.  On Windows it is part of
+  the MSYS2 toolchain above.  FreeBSD's base system does not have it, so
+  formatting is checked on Windows or Linux.
+* **MSYS2's gcc** on Windows (`pacman -S mingw-w64-ucrt-x86_64-gcc`) adds a
+  gcc pass to `check.bat`; see below.
+* **gcc on FreeBSD** (`pkg install gcc14`); see below.
 
 ### Presets
 

@@ -4,8 +4,8 @@
  */
 
 /*
- * moasweb's settings, as kept in its settings file (a JSON object) and
- * edited by the page's settings section.  The format is the Go version's:
+ * moas-web-client's settings, as kept in its settings file (a JSON object) and
+ * edited by the page's settings section.  The format:
  *
  *   { "Version": 1, "Server": "127.0.0.1:12059", "Listen": "127.0.0.1:8080",
  *     "Station": 1, "Rows": 6, "Columns": 5,

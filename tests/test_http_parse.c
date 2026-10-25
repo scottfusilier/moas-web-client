@@ -178,8 +178,8 @@ test_guard(void)
                        true, false, true, &m),
                  403);
     /* Served to the network: any Host. */
-    CHECK_INT_EQ(guard("GET / HTTP/1.1\r\nHost: moasweb.local\r\n\r\n", false,
-                       false, false, &m),
+    CHECK_INT_EQ(guard("GET / HTTP/1.1\r\nHost: moas-web-client.local\r\n\r\n",
+                       false, false, false, &m),
                  0);
 
     /* POST: the page's own origin, and JSON. */
@@ -191,7 +191,7 @@ test_guard(void)
     CHECK_INT_EQ(guard("POST /api/select HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n"
                        "Content-Type: application/json\r\n\r\n",
                        true, false, true, &m),
-                 0); /* no Origin at all: allowed, as in the Go version */
+                 0); /* no Origin at all: allowed */
     CHECK_INT_EQ(guard("POST /api/select HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n"
                        "Origin: http://evil.example\r\n"
                        "Content-Type: application/json\r\n\r\n",

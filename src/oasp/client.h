@@ -53,7 +53,7 @@ struct oasp_client_options {
     struct plat_addr server;
     struct oasp_hello hello;     /* copied; the caller's may go away */
     uint32_t connect_timeout_ms; /* 0: 5 seconds */
-    uint32_t retry_min_ms;       /* 0: 2 seconds, as the Go version */
+    uint32_t retry_min_ms;       /* 0: 2 seconds */
     uint32_t retry_max_ms;       /* 0: 30 seconds */
 };
 

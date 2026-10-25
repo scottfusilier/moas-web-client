@@ -1,5 +1,5 @@
 {
-    "_comment" : "Example moasweb settings.  Every entry is optional; missing ones take",
+    "_comment" : "Example moas-web-client settings.  Every entry is optional; missing ones take",
     "_comment" : "the defaults shown here.  _comment entries are ignored, but saving",
     "_comment" : "from the page's Settings section does not keep them.",
 

@@ -454,8 +454,8 @@ function render() {
 // ---- Settings ----
 //
 // The section edits a copy (draft) of the settings file.  Typing changes only
-// the draft; nothing reaches moasweb until Save.  Field names follow the
-// file, and each input's data-field is the path moasweb uses to point at a
+// the draft; nothing reaches moas-web-client until Save.  Field names follow the
+// file, and each input's data-field is the path moas-web-client uses to point at a
 // problem, such as "Radios.0.Sources.1.Address".
 
 const DEFAULT_ADDRESS = { n1mm: "127.0.0.1:12060", rigctld: "127.0.0.1:4532" };
@@ -592,7 +592,7 @@ function renderSettings() {
     parts.push(el("div", "banner", "The settings file has _comment notes in it. Saving from here keeps the settings but not the notes."));
   }
   if (view.overrides.length > 0) {
-    parts.push(el("div", "banner", "moasweb was started with " + view.overrides.join(", ") +
+    parts.push(el("div", "banner", "moas-web-client was started with " + view.overrides.join(", ") +
       ", which overrode the file. Saving puts what is shown here into effect and into the file."));
   }
 
@@ -653,7 +653,7 @@ function renderSettings() {
       input("Grid columns", draft, "Columns", "Columns", { type: "number", className: "num", min: "1" }),
     );
     parts.push(advanced);
-    parts.push(el("div", "muted", "The page is served at " + view.listen + " now. A new page address takes effect when moasweb is restarted. " +
+    parts.push(el("div", "muted", "The page is served at " + view.listen + " now. A new page address takes effect when moas-web-client is restarted. " +
       "An address other than 127.0.0.1 lets other computers on your network switch antennas (but not change settings)."));
   }
 
@@ -737,7 +737,7 @@ function renderSource(radio, i, src, j) {
         const body = await response.json();
         result.textContent = response.ok ? "✓ " + body.kHz + " kHz" : "✗ " + body.Message;
       } catch (err) {
-        result.textContent = "✗ could not reach moasweb";
+        result.textContent = "✗ could not reach moas-web-client";
       }
       if (cfg) cfg.tests[key] = result.textContent;
     }), result);
@@ -827,14 +827,14 @@ async function saveSettings() {
     });
     body = await response.json();
   } catch (err) {
-    showSettingsMessage("Could not reach moasweb; nothing was saved.", true);
+    showSettingsMessage("Could not reach moas-web-client; nothing was saved.", true);
     return;
   }
   if (!cfg) return;
   if (response.ok) {
     cfg.dirty = false;
     closeSettings();
-    toast(body.restart ? "Settings saved. Restart moasweb to serve the page at its new address." : "Settings saved.");
+    toast(body.restart ? "Settings saved. Restart moas-web-client to serve the page at its new address." : "Settings saved.");
     return;
   }
   if (response.status === 409) {

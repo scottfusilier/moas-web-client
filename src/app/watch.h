@@ -4,14 +4,14 @@
  */
 
 /*
- * moasweb -watch: connects to the MOAS server as one radio and prints
+ * moas-web-client -watch: connects to the MOAS server as one radio and prints
  * everything the server reports, including TR changes, until stopped.  It
  * is read-only: it sends Hello and nothing else, so it never changes what
  * the switch does.  (Even reporting a frequency could switch relays.)
  *
  * Because it reports no frequency, a radio whose frequency the server does
- * not know yet gets no configuration; watch mode says so.  Normally moasweb
- * or another client has reported it already.
+ * not know yet gets no configuration; watch mode says so.  Normally
+ * moas-web-client or another client has reported it already.
  */
 
 #ifndef MOAS_APP_WATCH_H

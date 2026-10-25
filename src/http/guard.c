@@ -6,8 +6,8 @@
 /*
  * The rules every request must meet before a handler sees it.  The MOAS
  * protocol has no login, so anything that can send requests here can switch
- * antennas; these rules make sure requests come from moasweb's own page.
- * They are the Go version's rules.
+ * antennas; these rules make sure requests come from moas-web-client's own
+ * page.
  */
 
 #include "core/common.h"

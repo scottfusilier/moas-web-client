@@ -16,7 +16,7 @@
 #define DEFAULT_SERVER "127.0.0.1:12059"
 #define DEFAULT_LISTEN "127.0.0.1:8080"
 
-/* Upper bounds beyond the Go version's "1 or more", to keep numbers sane. */
+/* Upper bounds beyond "1 or more", to keep numbers sane. */
 #define MAX_STATION 255
 #define MAX_RADIO 255
 #define MAX_GRID 64
@@ -242,10 +242,11 @@ apply_json(const cJSON *json, struct app_settings *s, bool *has_radios,
         return fail(err, "Version", "Version must be a whole number");
     }
     if (version > APP_SETTINGS_FORMAT) {
-        return fail(err, "Version",
-                    "the file is Version %d, written by a newer moasweb; "
-                    "this one understands up to %d",
-                    version, APP_SETTINGS_FORMAT);
+        return fail(
+            err, "Version",
+            "the file is Version %d, written by a newer moas-web-client; "
+            "this one understands up to %d",
+            version, APP_SETTINGS_FORMAT);
     }
     if (version < 1) {
         return fail(err, "Version",

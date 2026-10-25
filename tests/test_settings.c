@@ -5,8 +5,8 @@
 
 /*
  * The settings file: its format, checks, saving and reading, and how
- * moasweb starts with it.  Runs in its build folder, where it creates and
- * removes its own files.
+ * moas-web-client starts with it.  Runs in its build folder, where it creates
+ * and removes its own files.
  */
 
 #include "core/common.h"
@@ -160,9 +160,10 @@ test_problems(void)
     CHECK_PROBLEM("[1]", "", "the settings must be a JSON object");
     CHECK_PROBLEM("{\"Sever\":\"127.0.0.1:12059\"}", "",
                   "\"Sever\" is not a setting");
-    CHECK_PROBLEM("{\"Version\":2}", "Version",
-                  "the file is Version 2, written by a newer moasweb; this "
-                  "one understands up to 1");
+    CHECK_PROBLEM(
+        "{\"Version\":2}", "Version",
+        "the file is Version 2, written by a newer moas-web-client; this "
+        "one understands up to 1");
     CHECK_PROBLEM("{\"Version\":0}", "Version", NULL);
     CHECK_PROBLEM("{\"Server\":\"12059\"}", "Server",
                   "Server \"12059\" is not host:port with a numeric host, "
@@ -190,7 +191,7 @@ test_problems(void)
                   "use \"n1mm\" or \"rigctld\"");
 }
 
-/* The example shipped with moasweb is a good file. */
+/* The example shipped with moas-web-client is a good file. */
 static void
 test_example_file(void)
 {
@@ -275,7 +276,7 @@ test_recent_servers_and_sources(void)
 }
 
 #define FILE_A "test_settings_a.json"
-#define NESTED "test_settings_dir/config/moasweb/moasweb.json"
+#define NESTED "test_settings_dir/config/moas-web-client/moas-web-client.json"
 
 static void
 test_file_save_and_load(void)
@@ -336,7 +337,7 @@ test_startup(void)
     char error[256];
     char message[320];
     struct app_settings s;
-    char *argv[] = {(char *)(uintptr_t)"moasweb"};
+    char *argv[] = {(char *)(uintptr_t)"moas-web-client"};
 
     app_args_parse(1, argv, &args, error, sizeof(error));
 
@@ -369,7 +370,8 @@ test_startup(void)
     CHECK_INT_EQ(s.radio_count, 1);
     app_settings_fini(&s);
 
-    char *over[] = {(char *)(uintptr_t)"moasweb", (char *)(uintptr_t)"-server",
+    char *over[] = {(char *)(uintptr_t)"moas-web-client",
+                    (char *)(uintptr_t)"-server",
                     (char *)(uintptr_t)"10.0.0.4:12059",
                     (char *)(uintptr_t)"-station", (char *)(uintptr_t)"3"};
     app_args_parse(5, over, &args, error, sizeof(error));
@@ -382,7 +384,7 @@ test_startup(void)
     app_settings_fini(&s);
 
     /* -radios cannot override a file that lists radios. */
-    char *radios[] = {(char *)(uintptr_t)"moasweb",
+    char *radios[] = {(char *)(uintptr_t)"moas-web-client",
                       (char *)(uintptr_t)"-radios", (char *)(uintptr_t)"1,3"};
     app_args_parse(3, radios, &args, error, sizeof(error));
     CHECK_INT_EQ(app_startup_settings(FILE_A, &args, true, &s, message,
@@ -400,8 +402,8 @@ test_startup(void)
     app_settings_fini(&s);
 
     /* A bad command line is reported. */
-    char *bad[] = {(char *)(uintptr_t)"moasweb", (char *)(uintptr_t)"-server",
-                   (char *)(uintptr_t)"x"};
+    char *bad[] = {(char *)(uintptr_t)"moas-web-client",
+                   (char *)(uintptr_t)"-server", (char *)(uintptr_t)"x"};
     app_args_parse(3, bad, &args, error, sizeof(error));
     CHECK_INT_EQ(app_startup_settings(FILE_A, &args, true, &s, message,
                                       sizeof(message)),

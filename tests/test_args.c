@@ -20,14 +20,15 @@ parse(struct app_args *a, int argc, const char *const *argv)
 }
 
 #define PARSE(a, ...)                                                         \
-    parse((a), (int)ARRAY_LEN(((const char *[]){"moasweb", __VA_ARGS__})),    \
-          (const char *[]){"moasweb", __VA_ARGS__})
+    parse((a),                                                                \
+          (int)ARRAY_LEN(((const char *[]){"moas-web-client", __VA_ARGS__})), \
+          (const char *[]){"moas-web-client", __VA_ARGS__})
 
 static void
 test_defaults(void)
 {
     struct app_args a;
-    const char *argv[] = {"moasweb"};
+    const char *argv[] = {"moas-web-client"};
 
     CHECK_INT_EQ(parse(&a, 1, argv), 0);
     CHECK(!a.watch && !a.help && !a.version);
@@ -44,7 +45,7 @@ test_forms(void)
 {
     struct app_args a;
 
-    /* Go style, two dashes, and name=value all work. */
+    /* One dash, two dashes, and name=value all work. */
     CHECK_INT_EQ(PARSE(&a, "-watch", "-server", "192.168.1.10:12059",
                        "--radio=2", "-station", "3", "--rows", "4",
                        "-columns=8", "-config", "C:\\moas\\r\xc3\xa9.json"),

@@ -40,7 +40,7 @@ app_settings_find(const char *config, const char *argv0, char *out,
         }
     }
     if (plat_settings_dir(dir, sizeof(dir)) == 0) {
-        return join(out, size, dir, "moasweb", APP_SETTINGS_FILE_NAME);
+        return join(out, size, dir, "moas-web-client", APP_SETTINGS_FILE_NAME);
     }
     /* No settings folder (no home folder): the current folder, then. */
     int n = snprintf(out, size, "%s", APP_SETTINGS_FILE_NAME);
@@ -171,7 +171,7 @@ app_settings_save(const char *path, const struct app_settings *s,
     }
     /*
      * cJSON indents with tabs and puts a tab after each ':'; write four
-     * spaces and one space instead, as the Go version did.  Tabs inside
+     * spaces and one space instead.  Tabs inside
      * strings are escaped by cJSON, so every raw tab is layout.
      */
     struct buf out;

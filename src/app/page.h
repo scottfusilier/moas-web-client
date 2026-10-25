@@ -5,7 +5,6 @@
 
 /*
  * The web page, built into the program from page.html by cmake/embed.cmake.
- * page.html is the Go version's page, unchanged.
  */
 
 #ifndef MOAS_APP_PAGE_H

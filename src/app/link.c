@@ -161,7 +161,7 @@ connect_client(struct app_link *l, int station)
         .server = l->addr,
         .hello =
             {
-                .name = "moasweb",
+                .name = "moas-web-client",
                 .bidirectional = true,
                 .indicate_tr = true,
                 .radios = ids,

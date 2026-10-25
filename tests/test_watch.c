@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Scott Fusilier
  */
 
-/* moasweb -watch against a fake server. */
+/* moas-web-client -watch against a fake server. */
 
 #include "core/common.h"
 
