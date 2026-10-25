@@ -69,6 +69,30 @@ It must:
 If `parse` fails after allocating `config->data`, leave it there:
 `free_data` is called for you.
 
+Then write `write`, the other way round: it puts your settings back into a
+JSON object, which already holds `"Type"`, with the defaults filled in.
+moasweb uses it to save the settings file and to show the settings on the
+page, so whatever `write` produces must read back through `parse` as the
+same settings (the `fuzz_settings` target checks this):
+
+```c
+static int
+rigctld_write(const struct freq_source_config *config, cJSON *obj)
+{
+    const struct rigctld_config *cfg = config->data;
+    bool ok = cJSON_AddStringToObject(obj, "Address", cfg->addr_text) !=
+                  NULL &&
+              cJSON_AddNumberToObject(obj, "TimeoutSeconds",
+                                      config->timeout_ms / 1000.0) != NULL &&
+              cJSON_AddNumberToObject(obj, "PollMilliseconds", cfg->poll_ms) !=
+                  NULL;
+    return ok ? 0 : ERR_NOMEM;
+}
+```
+
+A setting that is optional and was not given (N1MM's `StationName`, for
+example) may be left out rather than written empty.
+
 ## 2. Running
 
 Write `start` and `stop`:
@@ -143,6 +167,7 @@ const struct freq_source_ops freq_rigctld_ops = {
     .type = "rigctld",
     .parse = rigctld_parse,
     .free_data = rigctld_free_data,
+    .write = rigctld_write,
     .start = rigctld_start,
     .stop = rigctld_stop,
     .env_fini = NULL,
@@ -156,7 +181,9 @@ it to `types[]` in `src/freq/registry.c`, and add your type's name to
 ## 6. Tests
 
 Add `tests/test_<type>.c` (and a line in `tests/CMakeLists.txt`).  Test the
-parser with good and bad input, the settings (defaults, and each error
-message), and the running source against a stand-in for the real program
-on the loopback interface, on the same event loop.  `tests/test_rigctld.c`
-does all of this.  Then run `scripts/check.sh` (or `scripts\check.bat`).
+parser with good and bad input, the settings (defaults, each error
+message, and that `write` reads back the same), and the running source
+against a stand-in for the real program on the loopback interface, on the
+same event loop.  `tests/test_rigctld.c` does all of this, with the
+stand-in in `tests/fake_rig.c`.  Add a sample settings file using your type
+to `fuzz/corpus/settings/`.  Then run `scripts/check.sh` (or `scripts\check.bat`).

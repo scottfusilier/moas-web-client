@@ -44,3 +44,17 @@ numbers follow [Semantic Versioning](https://semver.org/).
   server-sent event streams, and limits on connections, sizes and time.
 * `scripts\check.bat` always uses MSYS2's clang, and adds a gcc pass when
   MSYS2's gcc is installed.
+* moasweb's web mode: the page from the Go version, unchanged and built
+  into the program, with the same addresses and replies; live updates;
+  each radio's frequency followed from its sources, or typed on the page.
+  The page's own script and style are the only ones allowed to run.
+* The settings file, in the Go version's format and found in the same
+  places: checked field by field, saved from the page in one step, applied
+  without a restart (except `Listen`), never overwriting a change made by
+  hand meanwhile or a read-only file.  A missing or broken file does not
+  stop moasweb starting.  `moasweb.example.json` shows every setting.
+* `-listen` and `-radios`; options on the command line win over the file.
+  `-watch` takes the server and station from the settings file.
+* A warning at startup when the page can be reached from other computers.
+* Tests that run moasweb end to end against stand-ins for the MOAS server,
+  N1MM and rigctld, and a fuzz target for the settings file.

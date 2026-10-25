@@ -12,20 +12,41 @@ endorsed by the authors of MOAS.
 
 ## Status
 
-Under development: the web page does not exist yet.  This is a rewrite in C
-of an earlier version written in Go; the plan and its progress are in
-[docs/ROADMAP.md](docs/ROADMAP.md).
+Under development, not yet released.  This is a rewrite in C of an earlier
+version written in Go, and does what the Go version does; the plan and its
+progress are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
-What works so far is watch mode, for troubleshooting:
+## Using it
+
+```
+moasweb -server 192.168.1.10:12059
+```
+
+then open the address it prints (`http://127.0.0.1:8080/` by default) in a
+browser.  The page shows each radio's antenna buttons as the MOAS server
+lays them out; click one to select it.  Press Ctrl+C to stop.
+
+The settings are kept in `moasweb.json`: beside the program if there is one
+there, otherwise in your settings folder (`%APPDATA%\moasweb` on Windows,
+`~/.config/moasweb` on FreeBSD and Linux).  Edit them on the page's settings section,
+or by hand; [moasweb.example.json](moasweb.example.json) shows every
+setting, including where each radio's frequency comes from (N1MM Logger+
+or rigctld).  Options on the command line win over the file;
+`moasweb -help` lists them.
+
+By default the page can be opened only on the computer moasweb runs on.
+`-listen 0.0.0.0:8080` serves it to the network, but the MOAS protocol has
+no login, so anyone who can open the page can switch antennas.  Settings
+can only be changed from the computer moasweb runs on.
+
+For troubleshooting, watch mode prints everything the server reports for
+one radio (the buttons, what is selected, and transmit/receive changes):
 
 ```
 moasweb -watch -server 192.168.1.10:12059 -station 1 -radio 1
 ```
 
-It connects to the MOAS server as that radio and prints everything the
-server reports (the buttons, what is selected, and transmit/receive
-changes) until you press Ctrl+C.  It sends nothing but its greeting, so it
-never changes what the switch does.  `moasweb -help` lists the options.
+It sends nothing but its greeting, so it never changes what the switch does.
 
 ## Building
 

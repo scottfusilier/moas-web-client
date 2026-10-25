@@ -74,6 +74,7 @@ Tests link only the layers they need.
 moas-web-client/
 ├── CMakeLists.txt, CMakePresets.json
 ├── LICENSE, README.md, CHANGELOG.md, CONTRIBUTING.md
+├── moasweb.example.json           an example settings file with every setting
 ├── .editorconfig, .clang-format, .gitattributes, .gitignore
 ├── cmake/   platform  warnings  hardening  sanitizers  format  check_banned  embed (.cmake)
 ├── scripts/ check.sh, check.bat   build and test every preset, check formatting
@@ -83,7 +84,8 @@ moas-web-client/
 │   │   ├── err.h, err.c                           error codes shared by every layer
 │   │   ├── net.h, net_addr.c, net_posix.c, net_win.c   addresses, sockets, poll
 │   │   ├── net_pair.c                             a connected pair of loopback sockets
-│   │   ├── fs.h, fs_posix.c, fs_win.c             capped reads, replace in one step, settings folder
+│   │   ├── fs.h, fs_posix.c, fs_win.c             capped reads, replace in one step, settings
+│   │   │                                          folder, program folder, read-only files
 │   │   ├── clock.h, clock_posix.c, clock_win.c    monotonic and wall-clock time
 │   │   ├── proc.h, proc_posix.c, proc_win.c       UTF-8 arguments and console on Windows
 │   │   └── signal.h, signal_posix.c, signal_win.c Ctrl+C and SIGTERM wake the loop
@@ -95,6 +97,7 @@ moas-web-client/
 │   │   ├── buf.h, buf.c           growable buffer with a hard maximum
 │   │   ├── log.h, log.c           logging
 │   │   ├── json.h, json.c         typed, range-checked access over cJSON; writing JSON
+│   │   ├── sha256.h, sha256.c     SHA-256: settings file versions, the page's script hashes
 │   │   └── loop.h, loop.c         event loop: sockets, timers, deferred calls
 │   ├── oasp/                      prefix oasp_; usable on its own
 │   │   ├── oasp.h                 public types and message structs
@@ -115,22 +118,23 @@ moas-web-client/
 │   │   └── server.c               connections, responses with security headers,
 │   │                              replies sent later, server-sent events, limits
 │   └── app/                       prefix app_; moasweb
-│       ├── main.c                 startup order and clean shutdown
-│       ├── args.h, args.c         command line; -config and --config
+│       ├── main.c                 the command line, then web mode or watch mode
+│       ├── args.h, args.c         command line; which options were given
+│       ├── serve.h, serve.c       web mode: startup settings, start, Ctrl+C, shutdown
 │       ├── settings.h, settings.c       settings, defaults, validation by field
-│       ├── settings_file.c        lookup order, load, save in one step
-│       ├── link.h, link.c         server connection as the page sees it
-│       ├── snapshot.c             the JSON the page reads
-│       ├── web.c                  route handlers
-│       ├── runner.c               applies saved settings live
+│       ├── settings_file.h, settings_file.c   lookup order, load, version, save in one step
+│       ├── link.h, link.c         server connection as the page sees it; the snapshot JSON
+│       ├── runner.h, runner.c     sources, the follower, applying saved settings live
+│       ├── web.h, web.c           route handlers, live updates, the page's CSP
 │       ├── watch.c                -watch: prints what the server sends, changes nothing
-│       └── page.html              embedded at build time by cmake/embed.cmake
+│       └── page.h, page.html      embedded at build time by cmake/embed.cmake
 ├── tests/
 │   ├── test.h                     harness macros
 │   ├── fake_moas_server.c/.h      scripted MOAS server on loopback, same event loop
 │   ├── oasp_samples.h             sample server messages shared by tests and corpus
-│   ├── fake_rigctld.c, n1mm_send.c
-│   └── test_<module>.c            one per module
+│   ├── fake_rig.c/.h              rigctld stand-in on loopback, same event loop
+│   ├── http_client.c/.h           a small HTTP client on the same event loop
+│   └── test_<module>.c            one per module; test_web.c runs moasweb end to end
 ├── fuzz/
 │   ├── fuzz.h                     the entry point every target defines
 │   ├── fuzz_frame.c  fuzz_message.c  fuzz_n1mm_xml.c  fuzz_rigctld_reply.c
@@ -389,6 +393,48 @@ As built, Stage 4 differs from the plan, or adds to it, in these ways:
 * Tests: the scenarios of the Go `web_test`, `settings_test` and
   `follow_test`.
 
+As built, Stage 5 differs from the plan, or adds to it, in these ways:
+
+* The settings file is found as in the Go version: the `-config` file if
+  given; else `moasweb.json` beside the program, if there is one; else
+  `moasweb/moasweb.json` in the settings folder.  On Unix "beside the
+  program" works only when it was started by a path, not found on the
+  `PATH`.
+* A file's version is the SHA-256 of its contents.  The page sends back the
+  version it was shown; if the file has changed since, the save is refused
+  (409) rather than overwriting someone's hand edit.
+* Saving refuses a file that is read-only for this user, with a message
+  saying so, even on Unix where the folder would allow replacing it.
+* A file with a mistake never stops moasweb starting: it prints the
+  problem, runs on the defaults and leaves the file alone.  The page's
+  settings section shows as much of the file as could be read, with the
+  mistake marked.
+* Command-line options win over the file, and the page lists which were
+  given.  `-radios` cannot be combined with a file that lists radios.
+  Watch mode takes the server and station from the settings file unless
+  they are given.
+* Saving applies everything at once except `Listen`: the link reconnects
+  if the server, station, radios or grid size changed (keeping each
+  remaining radio's frequency), and the sources restart only if they
+  changed.
+  The reply says when a restart is needed for `Listen`.  The last six
+  servers are remembered for the page to offer.
+* The snapshot lives in `link.c`, which owns the state it describes.
+  Changes are sent to the open pages on the loop's next pass, so a burst of
+  messages from the server makes one update.
+* The page's `Content-Security-Policy` allows only its own inline script
+  and style, by SHA-256 hash, computed at startup from the embedded page.
+* Tests run moasweb end to end on loopback ports chosen by the system: the
+  page's requests go through the runner and the link to a fake MOAS server,
+  and the follower is tested with real N1MM (UDP) and rigctld (TCP)
+  sources.  `fuzz_settings` checks that any accepted file reads back the
+  same after being written, and that a refused one changes nothing.
+* Still to be tried by hand, as part of Stage 6's checklist: the page in
+  browsers, against the real switch, and with a real N1MM and rigctld.
+* No test talks to a real MOAS server.  Manual tries use a `--sim` server
+  on a port other than 12059, so that a real server on this computer is
+  never reached by mistake.
+
 ## Stage 6: parity, packaging, 1.0
 
 * Run alongside the Go version against a `--sim` server and the real switch,
@@ -409,13 +455,14 @@ This Windows PC (MSYS2 CLANG64 toolchain), the maintainer's FreeBSD
 machines, which also run fuzzing and the sanitizers, and a Linux virtual
 machine (Debian 13).
 
-**Deferred:** Stages 0 to 3 passed the check on Windows and FreeBSD, and
-fuzzing on FreeBSD, but have not yet been checked on Linux (maintainer's
-decisions, 2026-10-24, to keep going while the Debian VM is set up).  gcc
-builds on Windows (part of `check.bat`) and on FreeBSD cover gcc's
-warnings in the meantime.  What only Linux checks is memory leaks:
-LeakSanitizer runs by default only there.  Run `scripts/check.sh` on Linux
-before Stage 5 starts, and fix anything it finds then.
+**Deferred:** Stages 0 to 5 passed the check on Windows and FreeBSD, with
+clang and gcc, and fuzzing on FreeBSD, but have not yet been checked on
+Linux (maintainer's decisions, 2026-10-24 and 2026-10-25, to keep going
+while the Debian VM is set up).  gcc builds on Windows (part of
+`check.bat`) and on FreeBSD cover gcc's warnings in the meantime.  What
+only Linux checks is memory leaks: LeakSanitizer runs by default only
+there.  Run `scripts/check.sh` on Linux before Stage 6 starts, and fix
+anything it finds then.
 
 The maintainer keeps the git repository locally and decides later where, if
 anywhere, it is published.
