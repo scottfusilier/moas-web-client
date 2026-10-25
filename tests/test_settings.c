@@ -188,7 +188,7 @@ test_problems(void)
                   "{\"Type\":\"flrig\"}]}]}",
                   "Radios.0.Sources.1.Type",
                   "radio 2, source 2: Type \"flrig\" is not a known source; "
-                  "use \"n1mm\" or \"rigctld\"");
+                  "use \"n1mm\", \"dxlog\" or \"rigctld\"");
 }
 
 /* The example shipped with moas-web-client is a good file. */

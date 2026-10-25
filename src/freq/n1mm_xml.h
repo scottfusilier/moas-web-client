@@ -4,22 +4,27 @@
  */
 
 /*
- * Reading N1MM Logger+'s RadioInfo packets.  A packet looks like this, with
- * more fields:
+ * Reading the RadioInfo packets that N1MM Logger+ and DXLog.net broadcast.
+ * A packet looks like this, with more fields:
  *
  *   <?xml version="1.0" encoding="utf-8"?>
  *   <RadioInfo>
+ *     <app>N1MM</app>
  *     <StationName>RUN-PC</StationName>
  *     <RadioNr>1</RadioNr>
  *     <Freq>1402550</Freq>
  *     <IsConnected>True</IsConnected>
  *   </RadioInfo>
  *
- * Freq is in units of 10 Hz.  This is not a general XML parser: it accepts
- * the flat layout N1MM sends (an optional declaration, then <RadioInfo>
- * holding simple elements with text) and nothing else, which keeps the code
- * that reads packets from the network small.  N1MM sends other kinds of
- * packets to the same port; those are not RadioInfo and are refused.
+ * Freq is in units of 10 Hz.  DXLog sends the same layout with <app>DXLog
+ * </app>, names the station in <Station> rather than <StationName>, and has
+ * no IsConnected.
+ *
+ * This is not a general XML parser: it accepts the flat layout these
+ * programs send (an optional declaration, then <RadioInfo> holding simple
+ * elements with text) and nothing else, which keeps the code that reads
+ * packets from the network small.  Other kinds of packets sent to the same
+ * port are not RadioInfo and are refused.
  */
 
 #ifndef MOAS_FREQ_N1MM_XML_H
@@ -29,7 +34,16 @@
 #include "core/common.h"
 #include "core/str.h"
 
+/* Which program sent a packet, from its <app> element. */
+enum n1mm_app {
+    N1MM_APP_UNKNOWN, /* no <app> */
+    N1MM_APP_N1MM,
+    N1MM_APP_DXLOG,
+    N1MM_APP_OTHER, /* some other program */
+};
+
 struct n1mm_radio_info {
+    enum n1mm_app app;
     char station_name[CAPS_N1MM_STATION]; /* trimmed and cleaned */
     int radio_nr;                         /* 0 if missing */
     int64_t freq;                         /* 10 Hz units; 0 if missing */

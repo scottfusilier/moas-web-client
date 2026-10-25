@@ -21,7 +21,20 @@
 /* Packets read per wake-up, so that a flood cannot starve the loop. */
 #define PACKETS_PER_WAKE 32
 
+/*
+ * What sets the two types apart: their names, and which program's packets
+ * they follow.  Everything else, the listeners included, is shared.
+ */
+struct n1mm_kind {
+    const char *program; /* as shown: "N1MM", "DXLog" */
+    enum n1mm_app app;
+};
+
+static const struct n1mm_kind kind_n1mm = {"N1MM", N1MM_APP_N1MM};
+static const struct n1mm_kind kind_dxlog = {"DXLog", N1MM_APP_DXLOG};
+
 struct n1mm_config {
+    const struct n1mm_kind *kind;
     struct plat_addr addr;
     char addr_text[PLAT_ADDR_TEXT_MAX];
     int radio_nr;
@@ -32,6 +45,7 @@ struct n1mm_listener;
 
 struct n1mm_source {
     struct freq_source base;
+    const struct n1mm_kind *kind;
     struct n1mm_listener *listener;
     struct n1mm_source *next; /* the listener's other sources */
     int radio_nr;
@@ -73,13 +87,41 @@ fail_all(struct n1mm_listener *l)
     }
 }
 
+/* How a packet's program is shown in the radios heard. */
+static const char *
+program_name(enum n1mm_app app)
+{
+    switch (app) {
+    case N1MM_APP_N1MM:
+        return "N1MM";
+    case N1MM_APP_DXLOG:
+        return "DXLog";
+    case N1MM_APP_OTHER:
+        return "other";
+    default:
+        return "";
+    }
+}
+
+/*
+ * Whether a source of this kind follows a packet from app.  N1MM's own
+ * packets say <app>N1MM</app>; one without <app> is taken to be N1MM's too.
+ */
+static bool
+follows(const struct n1mm_kind *kind, enum n1mm_app app)
+{
+    return app == kind->app ||
+           (kind->app == N1MM_APP_N1MM && app == N1MM_APP_UNKNOWN);
+}
+
 static void
 remember(struct n1mm_listener *l, const struct n1mm_radio_info *info)
 {
+    const char *program = program_name(info->app);
     struct freq_n1mm_heard *slot = NULL;
     for (size_t i = 0; i < l->heard_count && slot == NULL; i++) {
         struct freq_n1mm_heard *h = &l->heard[i];
-        if (h->radio_nr == info->radio_nr &&
+        if (h->radio_nr == info->radio_nr && h->program == program &&
             str_eq_nocase(str_from_cstr(h->station_name),
                           str_from_cstr(info->station_name)))
         {
@@ -99,6 +141,7 @@ remember(struct n1mm_listener *l, const struct n1mm_radio_info *info)
         }
     }
     memcpy(slot->station_name, info->station_name, sizeof(slot->station_name));
+    slot->program = program;
     slot->radio_nr = info->radio_nr;
     slot->khz = n1mm_khz(info);
     slot->connected = info->connected;
@@ -111,7 +154,7 @@ deliver(struct n1mm_listener *l, const struct n1mm_radio_info *info)
     remember(l, info);
     struct str station = str_from_cstr(info->station_name);
     for (struct n1mm_source *s = l->sources; s != NULL; s = s->next) {
-        if (s->radio_nr != info->radio_nr) {
+        if (s->radio_nr != info->radio_nr || !follows(s->kind, info->app)) {
             continue;
         }
         if (s->station[0] != '\0' &&
@@ -120,7 +163,10 @@ deliver(struct n1mm_listener *l, const struct n1mm_radio_info *info)
             continue;
         }
         if (!info->connected) {
-            freq_feed_fail(s->feed, "N1MM says the radio is not connected");
+            char why[64];
+            snprintf(why, sizeof(why), "%s says the radio is not connected",
+                     s->kind->program);
+            freq_feed_fail(s->feed, why);
         } else if (n1mm_khz(info) > 0) {
             freq_feed_report(s->feed, n1mm_khz(info));
         }
@@ -137,7 +183,7 @@ give_up(struct n1mm_listener *l, int err)
         plat_socket_close(l->sock);
         l->sock = PLAT_INVALID_SOCKET;
     }
-    snprintf(l->error, sizeof(l->error), "cannot listen for N1MM on %s: %s",
+    snprintf(l->error, sizeof(l->error), "cannot listen on %s: %s",
              l->addr_text, err_str(err));
     fail_all(l);
     loop_timer_start(l->loop, &l->retry, RETRY_MS, 0);
@@ -168,7 +214,7 @@ on_packet(struct loop *loop, plat_socket sock, int events, void *arg)
         if (n1mm_parse_radio_info(str_make(l->packet, got), &info) == 0) {
             deliver(l, &info);
         }
-        /* Anything else is another N1MM packet type, or not N1MM at all. */
+        /* Anything else is another kind of packet, or from another program. */
     }
 }
 
@@ -266,7 +312,8 @@ n1mm_start(struct freq_env *env, const struct freq_source_config *config,
     }
     r->env = env;
     struct n1mm_source *s = &r->source;
-    s->base.ops = &freq_n1mm_ops;
+    s->base.ops = config->ops;
+    s->kind = cfg->kind;
     s->listener = l;
     s->radio_nr = cfg->radio_nr;
     memcpy(s->station, cfg->station, sizeof(s->station));
@@ -315,8 +362,9 @@ n1mm_env_fini(void *shared)
     free(s);
 }
 
+/* The settings of either type, which are the same. */
 static int
-n1mm_parse(const cJSON *json, int moas_radio,
+parse_kind(const cJSON *json, int moas_radio, const struct n1mm_kind *kind,
            struct freq_source_config *config, struct freq_field_error *err)
 {
     static const char *const allowed[] = {"Address", "RadioNr", "StationName",
@@ -324,7 +372,8 @@ n1mm_parse(const cJSON *json, int moas_radio,
     /* Settings of another type get a clearer message than unknown ones. */
     if (cJSON_GetObjectItemCaseSensitive(json, "PollMilliseconds") != NULL) {
         return freq_field_error(err, "PollMilliseconds",
-                                "PollMilliseconds does not apply to n1mm");
+                                "PollMilliseconds does not apply to %s",
+                                config->ops->type);
     }
     int e = freq_check_keys(json, allowed, err);
     if (e != 0) {
@@ -336,6 +385,7 @@ n1mm_parse(const cJSON *json, int moas_radio,
         return ERR_NOMEM;
     }
     config->data = cfg;
+    cfg->kind = kind;
 
     e = freq_parse_address(json, FREQ_N1MM_DEFAULT_ADDRESS, &cfg->addr,
                            cfg->addr_text, sizeof(cfg->addr_text), err);
@@ -371,13 +421,27 @@ n1mm_parse(const cJSON *json, int moas_radio,
         return e;
     }
     if (cfg->station[0] != '\0') {
-        snprintf(config->name, sizeof(config->name), "N1MM %s radio %d",
-                 cfg->station, cfg->radio_nr);
+        snprintf(config->name, sizeof(config->name), "%s %s radio %d",
+                 kind->program, cfg->station, cfg->radio_nr);
     } else {
-        snprintf(config->name, sizeof(config->name), "N1MM radio %d",
-                 cfg->radio_nr);
+        snprintf(config->name, sizeof(config->name), "%s radio %d",
+                 kind->program, cfg->radio_nr);
     }
     return 0;
+}
+
+static int
+n1mm_parse(const cJSON *json, int moas_radio,
+           struct freq_source_config *config, struct freq_field_error *err)
+{
+    return parse_kind(json, moas_radio, &kind_n1mm, config, err);
+}
+
+static int
+dxlog_parse(const cJSON *json, int moas_radio,
+            struct freq_source_config *config, struct freq_field_error *err)
+{
+    return parse_kind(json, moas_radio, &kind_dxlog, config, err);
 }
 
 static void
@@ -414,12 +478,30 @@ const struct freq_source_ops freq_n1mm_ops = {
     .env_fini = n1mm_env_fini,
 };
 
+/*
+ * DXLog shares N1MM's listeners (only one program can have a UDP port), so
+ * its shared state is kept under freq_n1mm_ops, which frees it.
+ */
+const struct freq_source_ops freq_dxlog_ops = {
+    .type = "dxlog",
+    .parse = dxlog_parse,
+    .free_data = n1mm_free_data,
+    .write = n1mm_write,
+    .start = n1mm_start,
+    .stop = n1mm_stop,
+    .env_fini = NULL,
+};
+
 static int
 compare_heard(const void *a, const void *b)
 {
     const struct freq_n1mm_heard *x = a;
     const struct freq_n1mm_heard *y = b;
-    int c = strcmp(x->station_name, y->station_name);
+    int c = strcmp(x->program, y->program);
+    if (c != 0) {
+        return c;
+    }
+    c = strcmp(x->station_name, y->station_name);
     if (c != 0) {
         return c;
     }

@@ -196,6 +196,7 @@ n1mm_parse_radio_info(struct str packet, struct n1mm_radio_info *out)
     }
 
     char value[VALUE_MAX];
+    bool have_station_name = false;
     while (!empty) {
         skip_space(&c);
         if (take(&c, "</")) {
@@ -230,7 +231,17 @@ n1mm_parse_radio_info(struct str packet, struct n1mm_radio_info *out)
         }
 
         int64_t number = 0;
-        if (name_is(name, "StationName")) {
+        if (name_is(name, "app")) {
+            struct str s = str_trim(str_from_cstr(value));
+            out->app = str_eq_nocase(s, STR_LIT("N1MM"))    ? N1MM_APP_N1MM
+                       : str_eq_nocase(s, STR_LIT("DXLog")) ? N1MM_APP_DXLOG
+                                                            : N1MM_APP_OTHER;
+        } else if (name_is(name, "StationName") ||
+                   (name_is(name, "Station") && !have_station_name))
+        {
+            /* DXLog's <Station>; N1MM's <StationName> wins if both. */
+            have_station_name = have_station_name ||
+                                name_is(name, "StationName");
             struct str s = str_trim(str_from_cstr(value));
             if (str_copy_clean(s, out->station_name,
                                sizeof(out->station_name)) != 0)

@@ -58,3 +58,8 @@ numbers follow [Semantic Versioning](https://semver.org/).
 * A warning at startup when the page can be reached from other computers.
 * Tests that run the program end to end against stand-ins for the MOAS
   server, N1MM and rigctld, and a fuzz target for the settings file.
+* The `dxlog` frequency source, for DXLog.net's radio information
+  broadcast.  It shares N1MM's listener and reader; N1MM and DXLog can send
+  to the same address, and each source follows only its own logger.  The
+  settings page offers it, and lists each logger's radios heard separately,
+  with how long ago each was heard.

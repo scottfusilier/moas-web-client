@@ -437,6 +437,18 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
   a `dxlog` type of its own, with a fuzzed reader, following
   `docs/adding-a-frequency-source.md`.  The captured packets become test
   samples either way.
+  * As built: DXLog.net 2.6 sends N1MM's RadioInfo layout, with
+    `<app>DXLog</app>`, `<Station>` for the station name, no
+    `IsConnected`, and a packet per radio about once a second.  It is a
+    `dxlog` type beside `n1mm`, in the same file and with the same
+    settings and reader; sources of both types on one address share its
+    listener, and each follows only its own program's packets (a packet
+    without `<app>` counts as N1MM's).  The page offers "+ DXLog" and
+    shows each source only its own logger's radios heard.
+  * Since DXLog sends no `IsConnected`, a radio set up in DXLog with no
+    rig behind it keeps reporting the frequency last shown for it.
+  * Still to try by hand: a live DXLog with a radio connected, tuning
+    across bands.
 * Try every feature from a checklist against a `--sim` server and the real
   switch, DXLog included.
 * CPack packages (`.zip` for Windows, `.tar.gz` elsewhere), with checksums.

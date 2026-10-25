@@ -59,9 +59,10 @@ int app_runner_save(struct app_runner *runner, const struct app_settings *next,
                     struct app_field_error *err);
 
 /*
- * For each address the N1MM sources listen on, the radios heard there:
- * { "127.0.0.1:12060": [ { "stationName", "radioNr", "kHz",
- * "connected" }, ... ] }.
+ * For each address the N1MM and DXLog sources listen on, the radios heard
+ * there: { "127.0.0.1:12060": [ { "app", "stationName", "radioNr", "kHz",
+ * "connected", "ageSeconds" }, ... ] }.  "app" is "N1MM", "DXLog", "other"
+ * or "" (not said).
  */
 cJSON *app_runner_heard(const struct app_runner *runner);
 

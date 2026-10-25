@@ -15,6 +15,7 @@
 #include "core/log.h"
 #include "freq/n1mm.h"
 #include "freq/source.h"
+#include "platform/clock.h"
 
 #define DEFAULT_RETRY_MS 2000
 
@@ -297,7 +298,7 @@ app_runner_heard(const struct app_runner *r)
     for (size_t i = 0; i < s->radio_count; i++) {
         for (size_t j = 0; j < s->radios[i].source_count; j++) {
             const struct freq_source_config *c = &s->radios[i].sources[j];
-            if (c->ops != &freq_n1mm_ops) {
+            if (c->ops != &freq_n1mm_ops && c->ops != &freq_dxlog_ops) {
                 continue;
             }
             /* The address as written in the settings, which the page uses. */
@@ -318,16 +319,21 @@ app_runner_heard(const struct app_runner *r)
                 {
                     n = freq_n1mm_heard(r->env, &addr, heard, CAPS_N1MM_HEARD);
                 }
+                uint64_t now = plat_monotonic_ms();
                 for (size_t k = 0; list != NULL && k < n; k++) {
                     cJSON *h = cJSON_CreateObject();
                     if (h == NULL || !cJSON_AddItemToArray(list, h)) {
                         break;
                     }
+                    cJSON_AddStringToObject(h, "app", heard[k].program);
                     cJSON_AddStringToObject(h, "stationName",
                                             heard[k].station_name);
                     cJSON_AddNumberToObject(h, "radioNr", heard[k].radio_nr);
                     cJSON_AddNumberToObject(h, "kHz", heard[k].khz);
                     cJSON_AddBoolToObject(h, "connected", heard[k].connected);
+                    cJSON_AddNumberToObject(
+                        h, "ageSeconds",
+                        (double)((now - heard[k].at_ms) / 1000));
                 }
             }
             cJSON_Delete(json);

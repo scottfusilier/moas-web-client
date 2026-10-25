@@ -3,9 +3,9 @@
 A cross-platform client for the MOAS II antenna switch server by M1DST and
 K1XM.  It connects to a MOAS server over the network and shows each radio's
 antenna buttons in a web page.  Each radio's frequency comes from N1MM
-Logger+, hamlib's rigctld, or is typed on the page.  It is meant to run on
-Windows, Linux, FreeBSD and macOS; for now it is built and tested on Windows,
-FreeBSD and Linux.
+Logger+, DXLog.net, hamlib's rigctld, or is typed on the page.  It is meant
+to run on Windows, Linux, FreeBSD and macOS; for now it is built and tested
+on Windows, FreeBSD and Linux.
 
 moas-web-client is an independent project and is not affiliated with or
 endorsed by the authors of MOAS.
@@ -29,10 +29,17 @@ there is one there, otherwise in your settings folder
 (`%APPDATA%\moas-web-client` on Windows, `~/.config/moas-web-client` on
 FreeBSD and Linux).  Edit them on the page's settings section, or by hand;
 [moas-web-client.example.json](moas-web-client.example.json) shows every
-setting, including where each radio's frequency comes from (N1MM Logger+
-or rigctld).  Command-line options are optional and win over the file, for
-example `moas-web-client -server 192.168.1.10:12059`;
+setting, including where each radio's frequency comes from (N1MM Logger+,
+DXLog.net or rigctld).  Command-line options are optional and win over the
+file, for example `moas-web-client -server 192.168.1.10:12059`;
 `moas-web-client -help` lists them.
+
+For DXLog.net, turn on Options → Broadcast → Radio information, and use a
+`dxlog` source; it listens where DXLog sends by default, 127.0.0.1:12060.
+N1MM and DXLog can both send to the same address: each source follows
+only its own logger's packets.  DXLog does not say when a radio is not
+connected, so a radio that is set up in DXLog but switched off keeps the
+frequency DXLog last showed for it.
 
 By default the page can be opened only on the computer moas-web-client
 runs on.  `-listen 0.0.0.0:8080` serves it to the network, but the MOAS

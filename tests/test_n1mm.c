@@ -41,6 +41,31 @@ make_packet(char *out, size_t size, const char *station, int radio_nr,
              station, radio_nr, freq, freq, connected);
 }
 
+/*
+ * A packet as DXLog.net 2.6 sends it (captured, with a generic call): the
+ * same layout, but <app>DXLog</app>, <Station> for the station name, and
+ * no IsConnected.
+ */
+static void
+make_dxlog_packet(char *out, size_t size, const char *station, int radio_nr,
+                  long long freq)
+{
+    snprintf(out, size,
+             "<?xml version=\"1.0\"?><RadioInfo><app>DXLog</app>"
+             "<logger>DXLog.net v2.6.37</logger><Station>%s</Station>"
+             "<RadioNr>%d</RadioNr><Freq>%lld</Freq><TXFreq>%lld</TXFreq>"
+             "<InactiveFreq>355150</InactiveFreq><Mode>SSB</Mode>"
+             "<OpCall></OpCall><mycall>W1AW</mycall>"
+             "<IsRunning>False</IsRunning><FocusEntry>197552</FocusEntry>"
+             "<Antenna>0</Antenna><Rotors></Rotors>"
+             "<FocusRadioNr>1</FocusRadioNr><IsStereo>False</IsStereo>"
+             "<IsSplit>False</IsSplit><ActiveRadioNr>1</ActiveRadioNr>"
+             "<Technique>SO2R</Technique><StationType>R</StationType>"
+             "<IsTransmitting>False</IsTransmitting><IFFrequency>"
+             "</IFFrequency></RadioInfo>",
+             station, radio_nr, freq, freq);
+}
+
 static int
 parse(const char *text, struct n1mm_radio_info *info)
 {
@@ -85,6 +110,45 @@ test_parse_packets(void)
                        &info),
                  0);
     CHECK_MEM_EQ(info.station_name, strlen(info.station_name), "A?[2J?B");
+}
+
+/* Which program sent a packet, and DXLog's name for the station. */
+static void
+test_parse_apps(void)
+{
+    char p[2048];
+    struct n1mm_radio_info info;
+
+    make_packet(p, sizeof(p), "RUN-PC", 1, 1402550, "True");
+    CHECK_INT_EQ(parse(p, &info), 0);
+    CHECK_INT_EQ(info.app, N1MM_APP_N1MM);
+
+    make_dxlog_packet(p, sizeof(p), "STN1", 2, 2134500);
+    CHECK_INT_EQ(parse(p, &info), 0);
+    CHECK_INT_EQ(info.app, N1MM_APP_DXLOG);
+    CHECK_MEM_EQ(info.station_name, strlen(info.station_name), "STN1");
+    CHECK_INT_EQ(info.radio_nr, 2);
+    CHECK_INT_EQ(n1mm_khz(&info), 21345);
+    CHECK(info.connected); /* DXLog does not say otherwise */
+
+    CHECK_INT_EQ(parse("<RadioInfo><Freq>1</Freq></RadioInfo>", &info), 0);
+    CHECK_INT_EQ(info.app, N1MM_APP_UNKNOWN);
+    CHECK_INT_EQ(parse("<RadioInfo><app> dxlog </app></RadioInfo>", &info), 0);
+    CHECK_INT_EQ(info.app, N1MM_APP_DXLOG);
+    CHECK_INT_EQ(parse("<RadioInfo><app>Other</app></RadioInfo>", &info), 0);
+    CHECK_INT_EQ(info.app, N1MM_APP_OTHER);
+
+    /* StationName wins over Station, in either order. */
+    CHECK_INT_EQ(parse("<RadioInfo><Station>B</Station><StationName>A"
+                       "</StationName></RadioInfo>",
+                       &info),
+                 0);
+    CHECK_MEM_EQ(info.station_name, strlen(info.station_name), "A");
+    CHECK_INT_EQ(parse("<RadioInfo><StationName>A</StationName><Station>B"
+                       "</Station></RadioInfo>",
+                       &info),
+                 0);
+    CHECK_MEM_EQ(info.station_name, strlen(info.station_name), "A");
 }
 
 static void
@@ -180,8 +244,47 @@ test_settings(void)
     CHECK_INT_EQ(parse_source("{\"Type\":\"flrig\"}", 1, &c, &err),
                  ERR_INVALID);
     CHECK_MEM_EQ(err.message, strlen(err.message),
-                 "Type \"flrig\" is not a known source; use \"n1mm\" or "
-                 "\"rigctld\"");
+                 "Type \"flrig\" is not a known source; use \"n1mm\", "
+                 "\"dxlog\" or \"rigctld\"");
+}
+
+/* The dxlog type takes the same settings, under its own name. */
+static void
+test_dxlog_settings(void)
+{
+    struct freq_source_config c;
+    struct freq_field_error err;
+
+    CHECK_INT_EQ(parse_source("{\"Type\":\"DXLog\"}", 2, &c, &err), 0);
+    CHECK(c.ops == &freq_dxlog_ops);
+    CHECK_MEM_EQ(c.name, strlen(c.name), "DXLog radio 2");
+    freq_source_config_fini(&c);
+
+    CHECK_INT_EQ(parse_source("{\"Type\":\"dxlog\",\"RadioNr\":1,"
+                              "\"StationName\":\"STN1\","
+                              "\"TimeoutSeconds\":5}",
+                              2, &c, &err),
+                 0);
+    CHECK_MEM_EQ(c.name, strlen(c.name), "DXLog STN1 radio 1");
+    /* Written back as dxlog, with the defaults filled in. */
+    cJSON *json = freq_source_to_json(&c);
+    char *text = json != NULL ? cJSON_PrintUnformatted(json) : NULL;
+    CHECK(text != NULL);
+    if (text != NULL) {
+        CHECK_MEM_EQ(text, strlen(text),
+                     "{\"Type\":\"dxlog\",\"Address\":\"127.0.0.1:12060\","
+                     "\"RadioNr\":1,\"StationName\":\"STN1\","
+                     "\"TimeoutSeconds\":5}");
+        cJSON_free(text);
+    }
+    cJSON_Delete(json);
+    freq_source_config_fini(&c);
+
+    CHECK_INT_EQ(parse_source("{\"Type\":\"dxlog\",\"PollMilliseconds\":1}", 1,
+                              &c, &err),
+                 ERR_INVALID);
+    CHECK_MEM_EQ(err.message, strlen(err.message),
+                 "PollMilliseconds does not apply to dxlog");
 }
 
 /* A free UDP port on the loopback interface. */
@@ -331,6 +434,109 @@ test_listener(void)
     loop_destroy(loop);
 }
 
+/*
+ * N1MM and DXLog sending to the same address: one listener, and each
+ * source follows only its own program's packets.
+ */
+static void
+test_dxlog_beside_n1mm(void)
+{
+    struct loop *loop;
+    struct freq_env *env;
+    struct freq_tracker *n1mm;
+    struct freq_tracker *dxlog;
+    struct freq_tracker *stn2;
+    struct freq_source *s1;
+    struct freq_source *s2;
+    struct freq_source *s3;
+    char address[PLAT_ADDR_TEXT_MAX];
+    char json[256];
+    char packet[2048];
+    int khz = 0;
+
+    free_udp_address(address, sizeof(address));
+    CHECK_INT_EQ(loop_create(&loop), 0);
+    CHECK_INT_EQ(freq_env_create(loop, &env), 0);
+    CHECK_INT_EQ(freq_tracker_create(loop, NULL, NULL, &n1mm), 0);
+    CHECK_INT_EQ(freq_tracker_create(loop, NULL, NULL, &dxlog), 0);
+    CHECK_INT_EQ(freq_tracker_create(loop, NULL, NULL, &stn2), 0);
+
+    snprintf(json, sizeof(json), "{\"Type\":\"n1mm\",\"Address\":\"%s\"}",
+             address);
+    CHECK_INT_EQ(start_source(env, json, 1, n1mm, &s1), 0);
+    snprintf(json, sizeof(json), "{\"Type\":\"dxlog\",\"Address\":\"%s\"}",
+             address);
+    CHECK_INT_EQ(start_source(env, json, 1, dxlog, &s2), 0);
+    snprintf(json, sizeof(json),
+             "{\"Type\":\"dxlog\",\"Address\":\"%s\",\"RadioNr\":1,"
+             "\"StationName\":\"stn2\"}",
+             address);
+    CHECK_INT_EQ(start_source(env, json, 1, stn2, &s3), 0);
+
+    struct plat_addr to;
+    plat_socket tx;
+    plat_addr_parse(address, strlen(address), &to);
+    CHECK_INT_EQ(plat_udp_open(&to, &tx), 0);
+
+    /* N1MM's packet reaches only the n1mm source. */
+    make_packet(packet, sizeof(packet), "RUN-PC", 1, 1402550, "True");
+    CHECK(send_until(loop, tx, &to, packet, n1mm, 14025));
+    CHECK_INT_EQ(freq_tracker_choose(dxlog, NULL, NULL), -1);
+
+    /* DXLog's reaches only the dxlog sources whose station matches. */
+    make_dxlog_packet(packet, sizeof(packet), "STN1", 1, 2134500);
+    CHECK(send_until(loop, tx, &to, packet, dxlog, 21345));
+    CHECK_INT_EQ(freq_tracker_choose(stn2, NULL, NULL), -1);
+    CHECK(freq_tracker_choose(n1mm, &khz, NULL) >= 0 && khz == 14025);
+    /* STN2 is followed by both: only one asked for a station. */
+    make_dxlog_packet(packet, sizeof(packet), "STN2", 1, 700500);
+    CHECK(send_until(loop, tx, &to, packet, stn2, 7005));
+    CHECK(freq_tracker_choose(dxlog, &khz, NULL) >= 0 && khz == 7005);
+
+    /* A packet that does not say who sent it is taken to be N1MM's. */
+    CHECK(send_until(loop, tx, &to,
+                     "<RadioInfo><RadioNr>1</RadioNr>"
+                     "<Freq>1803000</Freq></RadioInfo>",
+                     n1mm, 18030));
+    CHECK(freq_tracker_choose(dxlog, &khz, NULL) >= 0 && khz == 7005);
+
+    /* Another program's packets reach neither, but are heard. */
+    const char other[] = "<RadioInfo><app>Other</app><RadioNr>1</RadioNr>"
+                         "<Freq>350000</Freq></RadioInfo>";
+    struct freq_n1mm_heard heard[8];
+    size_t n = 0;
+    for (int i = 0; i < 100 && n < 5; i++) {
+        plat_sendto(tx, other, sizeof(other) - 1, &to);
+        loop_run_once(loop, 20);
+        n = freq_n1mm_heard(env, &to, heard, ARRAY_LEN(heard));
+    }
+    CHECK(freq_tracker_choose(n1mm, &khz, NULL) >= 0 && khz == 18030);
+    CHECK(freq_tracker_choose(dxlog, &khz, NULL) >= 0 && khz == 7005);
+
+    /* Heard, by program and then station. */
+    CHECK_INT_EQ(n, 5);
+    if (n == 5) {
+        CHECK_MEM_EQ(heard[0].program, strlen(heard[0].program), "");
+        CHECK_MEM_EQ(heard[1].program, strlen(heard[1].program), "DXLog");
+        CHECK_MEM_EQ(heard[1].station_name, strlen(heard[1].station_name),
+                     "STN1");
+        CHECK_MEM_EQ(heard[2].station_name, strlen(heard[2].station_name),
+                     "STN2");
+        CHECK_MEM_EQ(heard[3].program, strlen(heard[3].program), "N1MM");
+        CHECK_MEM_EQ(heard[4].program, strlen(heard[4].program), "other");
+    }
+
+    freq_source_stop(s1);
+    freq_source_stop(s2);
+    freq_source_stop(s3);
+    plat_socket_close(tx);
+    freq_tracker_destroy(n1mm);
+    freq_tracker_destroy(dxlog);
+    freq_tracker_destroy(stn2);
+    freq_env_destroy(env);
+    loop_destroy(loop);
+}
+
 static void
 test_address_in_use(void)
 {
@@ -359,7 +565,7 @@ test_address_in_use(void)
     struct freq_status st;
     freq_tracker_status(t, &st, 1);
     CHECK_INT_EQ(st.state, FREQ_ERROR);
-    CHECK(strstr(st.error, "cannot listen for N1MM on 127.0.0.1:") != NULL);
+    CHECK(strstr(st.error, "cannot listen on 127.0.0.1:") != NULL);
 
     /* Once the port is free, the retry succeeds and the error clears. */
     plat_socket_close(taken);
@@ -385,9 +591,12 @@ main(void)
         return 1;
     }
     RUN(test_parse_packets);
+    RUN(test_parse_apps);
     RUN(test_refuses_other_packets);
     RUN(test_settings);
+    RUN(test_dxlog_settings);
     RUN(test_listener);
+    RUN(test_dxlog_beside_n1mm);
     RUN(test_address_in_use);
     plat_net_fini();
     return test_summary();

@@ -23,6 +23,7 @@
 
 static const struct freq_source_ops *const types[] = {
     &freq_n1mm_ops,
+    &freq_dxlog_ops,
     &freq_rigctld_ops,
 };
 
@@ -59,7 +60,7 @@ freq_find_type(const char *name)
 const char *
 freq_type_list(void)
 {
-    return "\"n1mm\" or \"rigctld\"";
+    return "\"n1mm\", \"dxlog\" or \"rigctld\"";
 }
 
 int

@@ -833,6 +833,8 @@ test_follower(void)
                  "RUN-PC");
     CHECK_INT_EQ(number(one, "radioNr"), 1);
     CHECK_INT_EQ(number(one, "kHz"), 14025);
+    CHECK_MEM_EQ(text(one, "app"), strlen(text(one, "app")), "N1MM");
+    CHECK(number(one, "ageSeconds") >= 0 && number(one, "ageSeconds") < 5);
     cJSON_Delete(heard);
 
     /* A typed frequency holds until the followed source changes. */

@@ -458,7 +458,9 @@ function render() {
 // file, and each input's data-field is the path moas-web-client uses to point at a
 // problem, such as "Radios.0.Sources.1.Address".
 
-const DEFAULT_ADDRESS = { n1mm: "127.0.0.1:12060", rigctld: "127.0.0.1:4532" };
+const DEFAULT_ADDRESS = { n1mm: "127.0.0.1:12060", dxlog: "127.0.0.1:12060", rigctld: "127.0.0.1:4532" };
+// The loggers that broadcast RadioInfo packets, by source type.
+const LOGGERS = { n1mm: "N1MM", dxlog: "DXLog" };
 let settingsAllowed = false;
 let cfg = null;        // while open: { view, draft, advanced, dirty, heard, tests }
 let heardTimer = 0;
@@ -568,8 +570,8 @@ function change(edit) {
 }
 
 function newSource(type, radioNumber) {
-  return type === "n1mm"
-    ? { Type: "n1mm", Address: DEFAULT_ADDRESS.n1mm, RadioNr: radioNumber }
+  return LOGGERS[type]
+    ? { Type: type, Address: DEFAULT_ADDRESS[type], RadioNr: radioNumber }
     : { Type: "rigctld", Address: DEFAULT_ADDRESS.rigctld };
 }
 
@@ -693,6 +695,7 @@ function renderRadio(radio, i) {
   add.style.marginTop = "6px";
   add.append(
     smallButton("+ N1MM", "Add an N1MM source", () => change(() => radio.Sources.push(newSource("n1mm", radio.Radio)))),
+    smallButton("+ DXLog", "Add a DXLog source", () => change(() => radio.Sources.push(newSource("dxlog", radio.Radio)))),
     smallButton("+ rigctld", "Add a rigctld (hamlib) source", () => change(() => radio.Sources.push(newSource("rigctld")))),
   );
   box.append(add);
@@ -703,16 +706,17 @@ function renderSource(radio, i, src, j) {
   const path = "Radios." + i + ".Sources." + j + ".";
   const box = el("div", "s-src");
   const row = el("div", "row");
-  row.append(el("span", "kind", src.Type === "n1mm" ? "N1MM" : src.Type === "rigctld" ? "rigctld" : src.Type));
+  const logger = LOGGERS[src.Type];
+  row.append(el("span", "kind", logger || src.Type));
 
-  if (src.Type === "n1mm") {
+  if (logger) {
     row.append(
-      input("Listen on (host:port)", src, "Address", path + "Address", { className: "wide", placeholder: DEFAULT_ADDRESS.n1mm, onInput: updateHeard }),
-      input("N1MM radio", src, "RadioNr", path + "RadioNr", { type: "number", className: "num", min: "1", onInput: updateHeard }),
+      input("Listen on (host:port)", src, "Address", path + "Address", { className: "wide", placeholder: DEFAULT_ADDRESS[src.Type], onInput: updateHeard }),
+      input(logger + " radio", src, "RadioNr", path + "RadioNr", { type: "number", className: "num", min: "1", onInput: updateHeard }),
     );
     if (cfg.advanced) {
       row.append(
-        input("N1MM station name", src, "StationName", path + "StationName", { placeholder: "any", onInput: updateHeard }),
+        input(logger + " station name", src, "StationName", path + "StationName", { placeholder: "any", onInput: updateHeard }),
         input("Timeout (s)", src, "TimeoutSeconds", path + "TimeoutSeconds", { type: "number", className: "num", step: "0.5", placeholder: "never", blankZero: true }),
       );
     }
@@ -751,7 +755,7 @@ function renderSource(radio, i, src, j) {
   );
   box.append(row);
 
-  if (src.Type === "n1mm") {
+  if (logger) {
     const heard = el("div", "heard");
     heard.dataset.radio = String(i);
     heard.dataset.source = String(j);
@@ -760,24 +764,32 @@ function renderSource(radio, i, src, j) {
   return box;
 }
 
-// updateHeard fills in, under each N1MM source, the radios N1MM is actually
-// reporting on that address.  A click on one picks it.
+// heardBy says whether a radio heard was reported by this source's logger.
+// A packet that does not name its program is taken to be N1MM's.
+function heardBy(type, h) {
+  return type === "n1mm" ? h.app === "N1MM" || h.app === "" : h.app === LOGGERS[type];
+}
+
+// updateHeard fills in, under each N1MM or DXLog source, the radios that
+// logger is actually reporting on that address.  A click on one picks it.
 function updateHeard() {
   if (!cfg) return;
   for (const line of document.querySelectorAll("#settings .heard")) {
     const src = cfg.draft.Radios[Number(line.dataset.radio)].Sources[Number(line.dataset.source)];
-    const address = (src.Address || DEFAULT_ADDRESS.n1mm).trim();
-    const heard = cfg.heard[address];
+    const logger = LOGGERS[src.Type];
+    const address = (src.Address || DEFAULT_ADDRESS[src.Type]).trim();
+    const all = cfg.heard[address];
+    const heard = all === undefined ? undefined : all.filter((h) => heardBy(src.Type, h));
     const items = [];
     if (heard === undefined) {
       items.push("Not listening on " + address + " yet; save to start.");
     } else if (heard.length === 0) {
-      items.push("Nothing heard from N1MM on " + address + " yet.");
+      items.push("Nothing heard from " + logger + " on " + address + " yet.");
     } else {
       items.push("Heard:");
       const stations = new Set(heard.map((h) => h.stationName));
       for (const h of heard) {
-        const age = Math.round((Date.now() - Date.parse(h.at)) / 1000);
+        const age = h.ageSeconds;
         const name = (stations.size > 1 && h.stationName ? h.stationName + " " : "") + "radio " + h.radioNr;
         const state = h.connected ? h.kHz + " kHz" : "not connected";
         const chip = el("button", "", name + ": " + state + (age > 30 ? " (" + age + " s ago)" : ""));
