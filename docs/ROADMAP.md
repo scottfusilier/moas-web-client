@@ -500,6 +500,20 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
     N1MM's F-key caption as a Logger message whenever it changes.
   * Tried by hand against a `--sim` server: Prev and Next step through the
     configuration's relative antenna lists.
+* Transmit/receive state when the switch does not report it.  A server
+  starts every radio as inhibited, and only a switch with `IndicateTR` in
+  the server's configuration ever changes that; without it, every radio
+  shows INHIBITED for good, which looks like a fault.
+  * The INHIBITED badge's tooltip says what it means, and that if it never
+    changes the switch needs `IndicateTR`; the README says the same under
+    troubleshooting.
+  * Until some radio on the connection has reported receive or transmit,
+    an inhibited radio is shown as TX/RX NOT REPORTED, quietly, with the
+    same advice.  The usual badges return as soon as one does.  (A
+    station that inhibits a radio from the start with a function sees
+    "not reported" until something is keyed.)
+  * A `ShowTXRX` setting, on unless turned off: off, the client does not
+    ask the server for transmit/receive state at all, and shows none.
 * Try every feature from a checklist against a `--sim` server and the real
   switch, DXLog included, with configurations that use additive systems,
   on/off functions and relative antennas.

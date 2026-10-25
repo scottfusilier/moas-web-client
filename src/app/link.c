@@ -38,6 +38,7 @@ struct app_link {
     struct plat_addr addr;
     int rows; /* asked for in Hello */
     int columns;
+    bool show_txrx; /* ask for TR in Hello, and show it */
     struct radio radios[CAPS_OASP_RADIOS];
     size_t radio_count;
 
@@ -52,6 +53,13 @@ struct app_link {
      */
     char notice[CAPS_OASP_NOTICE];
     bool notice_exit;
+    /*
+     * Whether any radio has reported receive or transmit on this
+     * connection.  A server starts every radio as inhibited, and only a
+     * switch with IndicateTR changes that; until then an inhibited radio is
+     * shown as "unreported" rather than as a fault.
+     */
+    bool tr_reported;
 };
 
 /* After a server refuses this client, how long before asking again. */
@@ -89,6 +97,7 @@ forget_server(struct app_link *l)
         l->radios[i].have_tr = false;
         l->radios[i].logger[0] = '\0';
     }
+    l->tr_reported = false;
 }
 
 static void
@@ -157,6 +166,9 @@ on_message(struct oasp_client *client, struct oasp_message *msg, void *arg)
         if (r != NULL) {
             r->tr = msg->u.tr.tr;
             r->have_tr = true;
+            if (r->tr == OASP_TR_RECEIVE || r->tr == OASP_TR_TRANSMIT) {
+                l->tr_reported = true;
+            }
         }
         break;
     case OASP_UNKNOWN:
@@ -197,7 +209,7 @@ connect_client(struct app_link *l, int station)
             {
                 .name = "moas-web-client",
                 .bidirectional = true,
-                .indicate_tr = true,
+                .indicate_tr = l->show_txrx,
                 .radios = ids,
                 .radio_count = l->radio_count,
                 .rows = l->rows,
@@ -242,6 +254,7 @@ app_link_create(struct loop *loop, const struct app_settings *s,
     l->addr = s->server_addr;
     l->rows = s->rows;
     l->columns = s->columns;
+    l->show_txrx = s->show_txrx;
     struct oasp_radio_id ids[CAPS_OASP_RADIOS];
     radios_from(s, ids, &l->radio_count);
     for (size_t i = 0; i < l->radio_count; i++) {
@@ -275,7 +288,8 @@ app_link_reconfigure(struct app_link *l, const struct app_settings *s)
     radios_from(s, ids, &count);
 
     bool same = strcmp(l->address, s->server) == 0 && l->rows == s->rows &&
-                l->columns == s->columns && count == l->radio_count;
+                l->columns == s->columns && l->show_txrx == s->show_txrx &&
+                count == l->radio_count;
     for (size_t i = 0; same && i < count; i++) {
         same = ids[i].station == l->radios[i].id.station &&
                ids[i].radio == l->radios[i].id.radio;
@@ -309,6 +323,7 @@ app_link_reconfigure(struct app_link *l, const struct app_settings *s)
     l->addr = s->server_addr;
     l->rows = s->rows;
     l->columns = s->columns;
+    l->show_txrx = s->show_txrx;
 
     int err = connect_client(l, s->station);
     changed(l);
@@ -654,8 +669,26 @@ add_buttons(cJSON *radio, const struct radio *r)
     return true;
 }
 
+/*
+ * The radio's transmit/receive state as the page shows it: "" if not
+ * asked for or not known; "unreported" for an inhibited radio while no
+ * radio on the connection has reported receive or transmit, since the
+ * switch then probably does not report them at all.
+ */
+static const char *
+keying(const struct app_link *l, const struct radio *r)
+{
+    if (!l->show_txrx || !r->have_tr) {
+        return "";
+    }
+    if (r->tr == OASP_TR_INHIBITED && !l->tr_reported) {
+        return "unreported";
+    }
+    return oasp_tr_name(r->tr);
+}
+
 static bool
-add_radio(cJSON *radios, const struct radio *r)
+add_radio(cJSON *radios, const struct app_link *l, const struct radio *r)
 {
     cJSON *radio = cJSON_CreateObject();
     if (radio == NULL || !cJSON_AddItemToArray(radios, radio)) {
@@ -678,7 +711,7 @@ add_radio(cJSON *radios, const struct radio *r)
                                    c != NULL ? c->upper_khz : 0) != NULL &&
            add_text(radio, "tx", s != NULL ? s->tx_short_name : "") &&
            add_text(radio, "rx", s != NULL ? s->rx_short_name : "") &&
-           add_text(radio, "keying", r->have_tr ? oasp_tr_name(r->tr) : "") &&
+           add_text(radio, "keying", keying(l, r)) &&
            add_text(radio, "logger", r->logger) && add_buttons(radio, r);
 }
 
@@ -710,7 +743,7 @@ app_link_snapshot(const struct app_link *l, struct buf *out)
     cJSON *radios = ok ? cJSON_AddArrayToObject(root, "radios") : NULL;
     ok = radios != NULL;
     for (size_t i = 0; ok && i < l->radio_count; i++) {
-        ok = add_radio(radios, &l->radios[i]);
+        ok = add_radio(radios, l, &l->radios[i]);
     }
     int err = ok ? json_write(out, root) : ERR_NOMEM;
     cJSON_Delete(root);

@@ -41,6 +41,7 @@ test_defaults(void)
     CHECK_INT_EQ(s.station, 1);
     CHECK_INT_EQ(s.rows, 6);
     CHECK_INT_EQ(s.columns, 5);
+    CHECK(s.show_txrx);
     CHECK_INT_EQ(s.radio_count, 2);
     CHECK_INT_EQ(s.radios[1].radio, 2);
     app_settings_fini(&s);
@@ -86,6 +87,7 @@ test_full_file_and_comments(void)
     if (out != NULL) {
         CHECK(strstr(out, "_comment") == NULL);
         CHECK(strstr(out, "\"Version\":1") != NULL);
+        CHECK(strstr(out, "\"ShowTXRX\":true") != NULL);
         CHECK(strstr(out, "{\"Type\":\"n1mm\",\"Address\":\"127.0.0.1:12060\","
                           "\"RadioNr\":1}") != NULL);
         CHECK(strstr(out, "{\"Type\":\"rigctld\",\"Address\":\"127.0.0.1:"
@@ -173,6 +175,8 @@ test_problems(void)
     CHECK_PROBLEM("{\"Station\":\"one\"}", "Station",
                   "Station must be a whole number");
     CHECK_PROBLEM("{\"Rows\":0}", "Rows", "Rows must be 1 or more");
+    CHECK_PROBLEM("{\"ShowTXRX\":\"yes\"}", "ShowTXRX",
+                  "ShowTXRX must be true or false");
     CHECK_PROBLEM("{\"Columns\":1.5}", "Columns", NULL);
     CHECK_PROBLEM("{\"Radios\":[]}", "Radios",
                   "Radios must list at least one radio");

@@ -395,10 +395,17 @@ function makeCell(panel, button, enabled) {
   return cell;
 }
 
-const KEYING = { transmit: "TRANSMIT", receive: "RECEIVE", inhibited: "INHIBITED", unavailable: "TX/RX UNKNOWN" };
+const KEYING = {
+  transmit: "TRANSMIT", receive: "RECEIVE", inhibited: "INHIBITED",
+  unavailable: "TX/RX UNKNOWN", unreported: "TX/RX NOT REPORTED",
+};
+const INDICATE_TR = "set \"IndicateTR\": true on the switch in the MOAS server's configuration, then restart the server";
 const KEYING_TITLE = {
-  inhibited: "Another radio is transmitting",
+  inhibited: "This radio may not transmit now, usually because another radio is transmitting. " +
+    "If this never changes, the switch may not be reporting transmit and receive: " + INDICATE_TR + ".",
   unavailable: "The switch is not reachable, so the server cannot tell transmit from receive",
+  unreported: "No radio has reported transmit or receive, so the switch probably does not report them. " +
+    "To see them, " + INDICATE_TR + ". To hide this, turn off \"Show transmit/receive state\" in the settings.",
 };
 const SOURCE_STATE ={ waiting: "waiting", stale: "no recent reading", error: "not available" };
 
@@ -546,7 +553,7 @@ function closeSettings() {
 }
 
 function isAdvancedField(field) {
-  return /^(Listen|Rows|Columns)$/.test(field) || /\.(StationName|TimeoutSeconds|PollMilliseconds)$/.test(field);
+  return /^(Listen|Rows|Columns|ShowTXRX)$/.test(field) || /\.(StationName|TimeoutSeconds|PollMilliseconds)$/.test(field);
 }
 
 async function pollHeard() {
@@ -562,8 +569,10 @@ async function pollHeard() {
   if (cfg) heardTimer = setTimeout(pollHeard, 1500);
 }
 
-// toggle makes a labelled checkbox bound to obj[key]; off is left out.
-function toggle(label, obj, key, field, title) {
+// toggle makes a labelled checkbox bound to obj[key].  For a setting that
+// is off unless turned on, off is left out; for one that is on unless
+// turned off (defaultOn), it is stored as true or false.
+function toggle(label, obj, key, field, title, defaultOn = false) {
   const wrap = el("label", "field");
   wrap.style.flexDirection = "row";
   wrap.style.alignItems = "center";
@@ -572,9 +581,10 @@ function toggle(label, obj, key, field, title) {
   const box = el("input");
   box.type = "checkbox";
   box.dataset.field = field;
-  box.checked = obj[key] === true;
+  box.checked = defaultOn ? obj[key] !== false : obj[key] === true;
   box.addEventListener("change", () => {
-    if (box.checked) obj[key] = true;
+    if (defaultOn) obj[key] = box.checked;
+    else if (box.checked) obj[key] = true;
     else delete obj[key];
     cfg.dirty = true;
     box.classList.remove("invalid");
@@ -712,6 +722,9 @@ function renderSettings() {
       input("Page address (host:port)", draft, "Listen", "Listen", { className: "wide", placeholder: "127.0.0.1:8080" }),
       input("Grid rows", draft, "Rows", "Rows", { type: "number", className: "num", min: "1" }),
       input("Grid columns", draft, "Columns", "Columns", { type: "number", className: "num", min: "1" }),
+      toggle("Show transmit/receive state", draft, "ShowTXRX", "ShowTXRX",
+        "Ask the MOAS server for each radio's transmit/receive state and show it. " +
+        "The switch reports it only with \"IndicateTR\": true in the server's configuration.", true),
     );
     parts.push(advanced);
     parts.push(el("div", "muted", "The page is served at " + view.listen + " now. A new page address takes effect when moas-web-client is restarted. " +

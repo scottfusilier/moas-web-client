@@ -8,7 +8,7 @@
  * edited by the page's settings section.  The format:
  *
  *   { "Version": 1, "Server": "127.0.0.1:12059", "Listen": "127.0.0.1:8080",
- *     "Station": 1, "Rows": 6, "Columns": 5,
+ *     "Station": 1, "Rows": 6, "Columns": 5, "ShowTXRX": true,
  *     "Radios": [ { "Radio": 1, "Sources": [ { "Type": "n1mm", ... } ] } ],
  *     "RecentServers": [ ... ] }
  *
@@ -58,6 +58,7 @@ struct app_settings {
     int station;
     int rows; /* the grid size to ask the server for */
     int columns;
+    bool show_txrx; /* ask for, and show, transmit/receive state */
     struct app_radio_settings radios[CAPS_OASP_RADIOS];
     size_t radio_count;
     char recent[APP_RECENT_SERVERS][PLAT_ADDR_TEXT_MAX];

@@ -48,6 +48,7 @@ app_settings_defaults(struct app_settings *s)
     s->station = 1;
     s->rows = 6;
     s->columns = 5;
+    s->show_txrx = true;
     s->radios[0].radio = 1;
     s->radios[1].radio = 2;
     s->radio_count = 2;
@@ -231,8 +232,8 @@ apply_json(const cJSON *json, struct app_settings *s, bool *has_radios,
            struct app_field_error *err)
 {
     static const char *const allowed[] = {
-        "Version", "Server", "Listen",        "Station",  "Rows",
-        "Columns", "Radios", "RecentServers", "_comment", NULL};
+        "Version",  "Server", "Listen",        "Station",  "Rows", "Columns",
+        "ShowTXRX", "Radios", "RecentServers", "_comment", NULL};
 
     if (!cJSON_IsObject(json)) {
         return fail(err, "", "the settings must be a JSON object");
@@ -270,6 +271,9 @@ apply_json(const cJSON *json, struct app_settings *s, bool *has_radios,
         (e = read_count(json, "Columns", MAX_GRID, &s->columns, err)) != 0)
     {
         return e;
+    }
+    if (json_get_bool(json, "ShowTXRX", &s->show_txrx) != 0) {
+        return fail(err, "ShowTXRX", "ShowTXRX must be true or false");
     }
 
     const cJSON *radios;
@@ -409,7 +413,8 @@ app_settings_to_json(const struct app_settings *s)
               cJSON_AddStringToObject(root, "Listen", s->listen) != NULL &&
               cJSON_AddNumberToObject(root, "Station", s->station) != NULL &&
               cJSON_AddNumberToObject(root, "Rows", s->rows) != NULL &&
-              cJSON_AddNumberToObject(root, "Columns", s->columns) != NULL;
+              cJSON_AddNumberToObject(root, "Columns", s->columns) != NULL &&
+              cJSON_AddBoolToObject(root, "ShowTXRX", s->show_txrx) != NULL;
     cJSON *radios = ok ? cJSON_AddArrayToObject(root, "Radios") : NULL;
     ok = radios != NULL;
     for (size_t i = 0; ok && i < s->radio_count; i++) {

@@ -51,6 +51,11 @@ struct fixture {
     bool full;
     bool combo_on;
     bool inhibit_on;
+    /* Like a switch without IndicateTR: every radio stays inhibited. */
+    bool stuck;
+    /* More top-level settings for start_app(), such as ",\"ShowTXRX\":false".
+     */
+    const char *settings_extra;
 };
 
 static struct fixture fx;
@@ -195,7 +200,7 @@ on_fake_message(struct fake_server *server, const cJSON *msg, void *arg)
                          : "");
         fake_send("Configuration", p);
         send_state(station, radio, 12, 12);
-        send_tr(station, radio, 2);
+        send_tr(station, radio, fx.stuck ? 1 : 2);
     } else if (strcmp(name, "Function") == 0) {
         if (number(params, "Function") == 1) {
             /* Inhibit: on, off, or toggled. */
@@ -432,7 +437,8 @@ start_app(const char *radio)
 
     plat_addr_format(fake_server_addr(fx.fake), server);
     snprintf(settings, sizeof(settings),
-             "{\"Server\":\"%s\",\"Columns\":4,\"Radios\":[%s]}", server,
+             "{\"Server\":\"%s\",\"Columns\":4%s,\"Radios\":[%s]}", server,
+             fx.settings_extra != NULL ? fx.settings_extra : "",
              radio != NULL ? radio : "{\"Radio\":1}");
 
     app_settings_defaults(&s);
@@ -1406,6 +1412,85 @@ test_server_notices(void)
     stop();
 }
 
+static bool
+keying_is(const cJSON *snap, const char *want)
+{
+    return strcmp(text(radio_of(snap), "keying"), want) == 0;
+}
+
+static bool
+unreported(const cJSON *snap)
+{
+    return keying_is(snap, "unreported");
+}
+
+static bool
+inhibited(const cJSON *snap)
+{
+    return keying_is(snap, "inhibited");
+}
+
+/*
+ * A switch that does not report transmit/receive leaves every radio
+ * inhibited; that is shown as not reported, until one does report.
+ */
+static void
+test_txrx_not_reported(void)
+{
+    if (!start_loop()) {
+        return;
+    }
+    fx.stuck = true;
+    if (!start_app(NULL)) {
+        stop();
+        return;
+    }
+    connect_up();
+    post("/api/frequency", "{\"station\":1,\"radio\":1,\"frequency\":7000}");
+    EXPECT_RADIO(7000);
+    WAIT_FOR(unreported);
+
+    /* Once a radio reports, inhibited means inhibited. */
+    send_tr(1, 1, 3);
+    WAIT_FOR(transmitting);
+    send_tr(1, 1, 1);
+    WAIT_FOR(inhibited);
+
+    /* A new connection starts again from not reported. */
+    fake_server_drop_client(fx.fake);
+    cJSON_Delete(NEXT("Hello"));
+    EXPECT_RADIO(7000);
+    WAIT_FOR(unreported);
+    stop();
+}
+
+/* ShowTXRX off: not asked for, and nothing shown even if sent. */
+static void
+test_txrx_off(void)
+{
+    if (!start_loop()) {
+        return;
+    }
+    fx.settings_extra = ",\"ShowTXRX\":false";
+    if (!start_app(NULL)) {
+        stop();
+        return;
+    }
+    cJSON *hello = NEXT("Hello");
+    CHECK(hello != NULL && !cJSON_HasObjectItem(hello, "IndicateTR"));
+    cJSON_Delete(hello);
+    WAIT_FOR(server_named);
+    post("/api/frequency", "{\"station\":1,\"radio\":1,\"frequency\":7000}");
+    EXPECT_RADIO(7000);
+    WAIT_FOR(three_buttons);
+    send_tr(1, 1, 3);
+    wait_ms(100);
+    cJSON *snap = snapshot();
+    CHECK(keying_is(snap, ""));
+    cJSON_Delete(snap);
+    stop();
+}
+
 int
 main(void)
 {
@@ -1424,6 +1509,8 @@ main(void)
     RUN(test_server_notices);
     RUN(test_logger_antenna_and_caption);
     RUN(test_logger_settings_off);
+    RUN(test_txrx_not_reported);
+    RUN(test_txrx_off);
     plat_net_fini();
     return test_summary();
 }

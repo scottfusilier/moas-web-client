@@ -63,6 +63,20 @@ moas-web-client -watch -server 192.168.1.10:12059 -station 1 -radio 1
 
 It sends nothing but its greeting, so it never changes what the switch does.
 
+## Troubleshooting
+
+**Every radio shows TX/RX NOT REPORTED, or INHIBITED that never
+changes.**  A MOAS server starts every radio as inhibited, and only a
+switch that reports transmit and receive changes that.  Add
+`"IndicateTR" : true` to the switch's entry under `"Switches"` in the
+server's configuration and restart the server.  To show no
+transmit/receive state at all, turn off "Show transmit/receive state" in
+the advanced settings (`"ShowTXRX" : false`).
+
+**The page says the MOAS server refused this client.**  The server allows
+only one client and another is connected; moas-web-client asks again every
+minute.
+
 ## Building
 
 Needs CMake 3.21 or later, Ninja, and a C11 compiler: clang on FreeBSD, gcc

@@ -76,6 +76,10 @@ numbers follow [Semantic Versioning](https://semver.org/).
   (N1MM's Alt-F9) step through the band's relative antennas, except with a
   band change.  `SendFKeyText` for N1MM sources: the F-key caption is
   passed to the server.  Both are off unless turned on.
+* Transmit/receive state when the switch does not report it: shown as
+  TX/RX NOT REPORTED until a radio reports receive or transmit, rather
+  than as every radio inhibited, with advice to set `IndicateTR` on the
+  switch.  `ShowTXRX` (on unless turned off) stops asking for it.
 
 ### Fixed
 
