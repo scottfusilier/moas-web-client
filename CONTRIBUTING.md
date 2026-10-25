@@ -73,9 +73,9 @@ compiler family.  For fuzzing, also install clang (`apt install clang`, and
    ctest --preset release
    ```
 
-The program is `build\release\src\app\moas-web-client.exe`.  It needs only what
-comes with Windows 10 and later, so it can be copied to another computer
-and run there without MSYS2.
+The program is `build\release\src\app\moas-web-client.exe`.  It needs only
+what comes with Windows 10 and later, so it can be copied to another
+computer and run there without MSYS2.
 
 To build from PowerShell instead, put MSYS2's tools first on `PATH` and name
 the compiler, for that window only:

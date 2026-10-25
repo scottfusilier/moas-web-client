@@ -427,10 +427,18 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
   on a port other than 12059, so that a real server on this computer is
   never reached by mistake.
 
-## Stage 6: trial, packaging, 1.0
+## Stage 6: DXLog, trial, packaging, 1.0
 
+* DXLog as a frequency source.  DXLog.net, like N1MM Logger+, reports each
+  radio's frequency over UDP.  First find out exactly what it sends, from
+  packets captured at a station: if it is N1MM's RadioInfo format, the
+  `n1mm` type may already read it (its reader does not check which program
+  sent the packet) and needs only tests and documenting; otherwise it gets
+  a `dxlog` type of its own, with a fuzzed reader, following
+  `docs/adding-a-frequency-source.md`.  The captured packets become test
+  samples either way.
 * Try every feature from a checklist against a `--sim` server and the real
-  switch.
+  switch, DXLog included.
 * CPack packages (`.zip` for Windows, `.tar.gz` elsewhere), with checksums.
 * Build and test on macOS, and with MSVC, before 1.0.
 * User guide, `docs/architecture.md` and protocol notes.
