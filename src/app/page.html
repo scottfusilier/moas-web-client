@@ -562,6 +562,27 @@ async function pollHeard() {
   if (cfg) heardTimer = setTimeout(pollHeard, 1500);
 }
 
+// toggle makes a labelled checkbox bound to obj[key]; off is left out.
+function toggle(label, obj, key, field, title) {
+  const wrap = el("label", "field");
+  wrap.style.flexDirection = "row";
+  wrap.style.alignItems = "center";
+  wrap.style.gap = "6px";
+  if (title) wrap.title = title;
+  const box = el("input");
+  box.type = "checkbox";
+  box.dataset.field = field;
+  box.checked = obj[key] === true;
+  box.addEventListener("change", () => {
+    if (box.checked) obj[key] = true;
+    else delete obj[key];
+    cfg.dirty = true;
+    box.classList.remove("invalid");
+  });
+  wrap.append(box, label);
+  return wrap;
+}
+
 // input makes a labelled input bound to obj[key].
 function input(label, obj, key, field, options = {}) {
   const wrap = el("label", "field");
@@ -757,6 +778,14 @@ function renderSource(radio, i, src, j) {
         input(logger + " station name", src, "StationName", path + "StationName", { placeholder: "any", onInput: updateHeard }),
         input("Timeout (s)", src, "TimeoutSeconds", path + "TimeoutSeconds", { type: "number", className: "num", step: "0.5", placeholder: "never", blankZero: true }),
       );
+    }
+    row.append(toggle("Follow " + logger + "'s antenna changes" + (src.Type === "n1mm" ? " (Alt-F9)" : ""), src, "FollowAntenna",
+      path + "FollowAntenna",
+      "When " + logger + " moves to its next antenna, step to the next antenna in this band's list. " +
+      "Changes that come with a band change are left to the server."));
+    if (src.Type === "n1mm") {
+      row.append(toggle("Send F-key text", src, "SendFKeyText", path + "SendFKeyText",
+        "Pass the caption of the F-key message N1MM is sending to the server, which shows it to other clients for this radio"));
     }
   } else {
     row.append(input("rigctld at (host:port)", src, "Address", path + "Address", { className: "wide", placeholder: DEFAULT_ADDRESS.rigctld }));

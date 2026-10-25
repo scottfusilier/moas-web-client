@@ -39,6 +39,8 @@ struct n1mm_config {
     char addr_text[PLAT_ADDR_TEXT_MAX];
     int radio_nr;
     char station[CAPS_N1MM_STATION]; /* "" accepts any */
+    bool follow_antenna;             /* pass on the logger's antenna changes */
+    bool send_caption;               /* pass on N1MM's F-key caption */
 };
 
 struct n1mm_listener;
@@ -51,6 +53,10 @@ struct n1mm_source {
     int radio_nr;
     char station[CAPS_N1MM_STATION];
     struct freq_feed feed;
+    bool follow_antenna;
+    bool send_caption;
+    int last_antenna; /* -1 until the first one: that only sets a baseline */
+    char last_caption[CAPS_N1MM_CAPTION];
 };
 
 /* One UDP address, shared by every source that uses it. */
@@ -148,6 +154,37 @@ remember(struct n1mm_listener *l, const struct n1mm_radio_info *info)
     slot->at_ms = plat_monotonic_ms();
 }
 
+/*
+ * What the operator did besides tuning, if the settings ask for it: a
+ * changed antenna number (the first one seen is only a baseline), and a
+ * changed F-key caption.
+ */
+static void
+pass_on(struct n1mm_source *s, const struct n1mm_radio_info *info)
+{
+    if (s->follow_antenna && info->have_antenna) {
+        if (s->last_antenna >= 0 && info->antenna != s->last_antenna) {
+            const struct freq_event e = {
+                .kind = FREQ_EVENT_ANTENNA_STEP,
+                .khz = n1mm_khz(info),
+            };
+            freq_feed_event(s->feed, &e);
+        }
+        s->last_antenna = info->antenna;
+    }
+    if (s->send_caption && info->have_caption &&
+        strcmp(info->caption, s->last_caption) != 0)
+    {
+        memcpy(s->last_caption, info->caption, sizeof(s->last_caption));
+        const struct freq_event e = {
+            .kind = FREQ_EVENT_TEXT,
+            .khz = n1mm_khz(info),
+            .text = s->last_caption,
+        };
+        freq_feed_event(s->feed, &e);
+    }
+}
+
 static void
 deliver(struct n1mm_listener *l, const struct n1mm_radio_info *info)
 {
@@ -169,6 +206,7 @@ deliver(struct n1mm_listener *l, const struct n1mm_radio_info *info)
             freq_feed_fail(s->feed, why);
         } else if (n1mm_khz(info) > 0) {
             freq_feed_report(s->feed, n1mm_khz(info));
+            pass_on(s, info);
         }
     }
 }
@@ -318,6 +356,9 @@ n1mm_start(struct freq_env *env, const struct freq_source_config *config,
     s->radio_nr = cfg->radio_nr;
     memcpy(s->station, cfg->station, sizeof(s->station));
     s->feed = feed;
+    s->follow_antenna = cfg->follow_antenna;
+    s->send_caption = cfg->send_caption;
+    s->last_antenna = -1;
     s->next = l->sources;
     l->sources = s;
     if (l->error[0] != '\0') {
@@ -367,8 +408,9 @@ static int
 parse_kind(const cJSON *json, int moas_radio, const struct n1mm_kind *kind,
            struct freq_source_config *config, struct freq_field_error *err)
 {
-    static const char *const allowed[] = {"Address", "RadioNr", "StationName",
-                                          "TimeoutSeconds", NULL};
+    static const char *const allowed[] = {
+        "Address",       "RadioNr",      "StationName", "TimeoutSeconds",
+        "FollowAntenna", "SendFKeyText", NULL};
     /* Settings of another type get a clearer message than unknown ones. */
     if (cJSON_GetObjectItemCaseSensitive(json, "PollMilliseconds") != NULL) {
         return freq_field_error(err, "PollMilliseconds",
@@ -420,6 +462,22 @@ parse_kind(const cJSON *json, int moas_radio, const struct n1mm_kind *kind,
     if (e != 0) {
         return e;
     }
+    if (json_get_bool(json, "FollowAntenna", &cfg->follow_antenna) != 0) {
+        return freq_field_error(err, "FollowAntenna",
+                                "FollowAntenna must be true or false");
+    }
+    /* Only N1MM sends the caption of the F-key message it is sending. */
+    if (kind->app != N1MM_APP_N1MM &&
+        cJSON_GetObjectItemCaseSensitive(json, "SendFKeyText") != NULL)
+    {
+        return freq_field_error(err, "SendFKeyText",
+                                "SendFKeyText does not apply to %s",
+                                config->ops->type);
+    }
+    if (json_get_bool(json, "SendFKeyText", &cfg->send_caption) != 0) {
+        return freq_field_error(err, "SendFKeyText",
+                                "SendFKeyText must be true or false");
+    }
     if (cfg->station[0] != '\0') {
         snprintf(config->name, sizeof(config->name), "%s %s radio %d",
                  kind->program, cfg->station, cfg->radio_nr);
@@ -464,6 +522,12 @@ n1mm_write(const struct freq_source_config *config, cJSON *obj)
     if (ok && config->timeout_ms != 0) {
         ok = cJSON_AddNumberToObject(obj, "TimeoutSeconds",
                                      config->timeout_ms / 1000.0) != NULL;
+    }
+    if (ok && cfg->follow_antenna) {
+        ok = cJSON_AddTrueToObject(obj, "FollowAntenna") != NULL;
+    }
+    if (ok && cfg->send_caption) {
+        ok = cJSON_AddTrueToObject(obj, "SendFKeyText") != NULL;
     }
     return ok ? 0 : ERR_NOMEM;
 }

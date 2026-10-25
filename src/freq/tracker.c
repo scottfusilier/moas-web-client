@@ -31,6 +31,8 @@ struct freq_tracker {
     uint64_t (*now)(void *arg);
     void *now_arg;
     struct loop_timer timer;
+    freq_event_fn *on_event;
+    void *event_arg;
 
     struct slot slots[CAPS_FREQ_SOURCES];
     size_t count;
@@ -193,6 +195,26 @@ freq_feed_fail(struct freq_feed feed, const char *reason)
         memcpy(s->error, "failed", 7);
     }
     notice(t);
+}
+
+void
+freq_tracker_on_event(struct freq_tracker *t, freq_event_fn *fn, void *arg)
+{
+    t->on_event = fn;
+    t->event_arg = arg;
+}
+
+void
+freq_feed_event(struct freq_feed feed, const struct freq_event *event)
+{
+    struct freq_tracker *t = feed.tracker;
+    if (t->on_event == NULL) {
+        return;
+    }
+    int followed = freq_tracker_choose(t, NULL, NULL);
+    if (followed >= 0 && (size_t)followed == feed.index) {
+        t->on_event(t, event, t->event_arg);
+    }
 }
 
 int

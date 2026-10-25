@@ -75,6 +75,15 @@
 /* Longest N1MM station name, in bytes of UTF-8, including the NUL. */
 #define CAPS_N1MM_STATION 64
 
+/* Longest F-key caption kept from N1MM, including the NUL. */
+#define CAPS_N1MM_CAPTION 128
+
+/*
+ * Longest value of any element in a RadioInfo packet, including the NUL;
+ * a packet with a longer one is refused.
+ */
+#define CAPS_N1MM_VALUE 256
+
 /* Most radios remembered as heard on one N1MM address. */
 #define CAPS_N1MM_HEARD 32
 

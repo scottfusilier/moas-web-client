@@ -83,6 +83,33 @@ on_tracker_changed(struct freq_tracker *tracker, void *arg)
     app_link_notify(f->runner->link);
 }
 
+/* What the followed logger's operator did, passed on to the server. */
+static void
+on_tracker_event(struct freq_tracker *tracker, const struct freq_event *e,
+                 void *arg)
+{
+    (void)tracker;
+    struct followed *f = arg;
+    struct app_link *link = f->runner->link;
+
+    switch (e->kind) {
+    case FREQ_EVENT_ANTENNA_STEP:
+        /*
+         * A logger may pick another antenna when it changes band; the
+         * server picks for the new band itself, so a step then would go
+         * one too far.  Only steps within the band the server last gave
+         * buttons for are passed on.
+         */
+        if (app_link_in_band(link, f->id, e->khz)) {
+            app_link_step(link, f->id, true);
+        }
+        break;
+    case FREQ_EVENT_TEXT:
+        app_link_send_logger(link, f->id, e->text);
+        break;
+    }
+}
+
 static void
 stop_sources(struct app_runner *r)
 {
@@ -119,6 +146,7 @@ start_sources(struct app_runner *r)
             log_error("radio %d: out of memory for its sources", rs->radio);
             continue;
         }
+        freq_tracker_on_event(f->tracker, on_tracker_event, f);
         r->radio_count++;
         for (size_t j = 0; j < rs->source_count; j++) {
             const struct freq_source_config *c = &rs->sources[j];

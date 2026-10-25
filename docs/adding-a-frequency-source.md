@@ -21,6 +21,20 @@ The tracker decides which source to believe: the first one that is up.  A
 source never needs to know about the other sources, the radio's priorities,
 or the MOAS server.
 
+A logger may also say what its operator did besides tuning.  A source can
+pass that on as an event, after reporting the frequency that came with it:
+
+```c
+const struct freq_event e = {.kind = FREQ_EVENT_ANTENNA_STEP, .khz = 14025};
+freq_feed_event(feed, &e);       /* the operator moved to the next antenna */
+```
+
+The tracker hands an event on only if it comes from the source the radio
+is following, so two loggers never act on one radio.  `FREQ_EVENT_TEXT`
+carries a logger's message for the radio.  Raise events only when the
+source's settings ask for them (the `n1mm` type's `FollowAntenna` and
+`SendFKeyText`): they change the switch, or what other clients show.
+
 Sources run on the event loop (`src/core/loop.h`), like everything else.  A
 source must never block: it uses non-blocking sockets from
 `src/platform/net.h`, waits for them with `loop_watch()`, and keeps time

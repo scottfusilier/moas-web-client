@@ -801,6 +801,20 @@ send_n1mm(plat_socket tx, const struct plat_addr *to, long long freq,
     plat_sendto(tx, packet, strlen(packet), to);
 }
 
+/* An N1MM packet with its antenna number and F-key caption. */
+static void
+send_n1mm_antenna(plat_socket tx, const struct plat_addr *to, long long freq,
+                  int antenna, const char *caption)
+{
+    char packet[512];
+    snprintf(packet, sizeof(packet),
+             "<RadioInfo><app>N1MM</app><RadioNr>1</RadioNr>"
+             "<Freq>%lld</Freq><Antenna>%d</Antenna>"
+             "<FunctionKeyCaption>%s</FunctionKeyCaption></RadioInfo>",
+             freq, antenna, caption);
+    plat_sendto(tx, packet, strlen(packet), to);
+}
+
 static void
 wait_ms(int ms)
 {
@@ -1243,6 +1257,105 @@ test_every_kind_of_button(void)
     stop();
 }
 
+/*
+ * N1MM's antenna changes (Alt-F9) and F-key captions, passed on when the
+ * source's settings ask for it.
+ */
+static void
+test_logger_antenna_and_caption(void)
+{
+    struct plat_addr n1mm;
+    plat_socket probe = PLAT_INVALID_SOCKET;
+    plat_socket tx = PLAT_INVALID_SOCKET;
+    char n1mm_text[PLAT_ADDR_TEXT_MAX];
+    char radio[256];
+
+    plat_addr_parse("127.0.0.1:0", 11, &n1mm);
+    CHECK_INT_EQ(plat_udp_bind(&n1mm, &probe), 0);
+    plat_socket_local_addr(probe, &n1mm);
+    plat_socket_close(probe);
+    plat_addr_format(&n1mm, n1mm_text);
+    CHECK_INT_EQ(plat_udp_open(&n1mm, &tx), 0);
+    snprintf(radio, sizeof(radio),
+             "{\"Radio\":1,\"Sources\":[{\"Type\":\"n1mm\",\"Address\":\"%s\","
+             "\"RadioNr\":1,\"FollowAntenna\":true,\"SendFKeyText\":true}]}",
+             n1mm_text);
+    if (!start(radio)) {
+        plat_socket_close(tx);
+        return;
+    }
+    connect_up();
+
+    /* The first antenna number only sets a baseline. */
+    send_n1mm_antenna(tx, &n1mm, 701000, 1, "");
+    EXPECT_RADIO(7010);
+    WAIT_FOR(three_buttons);
+    EXPECT_NOTHING(200);
+
+    /* Alt-F9 within the band: the next antenna. */
+    send_n1mm_antenna(tx, &n1mm, 701000, 2, "");
+    EXPECT_ANTENNA("TX:6/0,RX:6/0");
+
+    /*
+     * A new antenna that comes with a band change is the logger's own
+     * choice for the band; the server picks for the band itself.
+     */
+    send_n1mm_antenna(tx, &n1mm, 1402500, 3, "");
+    EXPECT_RADIO(14025);
+    EXPECT_NOTHING(200);
+
+    /* The F-key caption, when it changes, and when it clears. */
+    send_n1mm_antenna(tx, &n1mm, 1402500, 3, "CQ");
+    cJSON *p = NEXT("Logger");
+    CHECK_MEM_EQ(text(p, "Message"), strlen(text(p, "Message")), "CQ");
+    CHECK_INT_EQ(number(p, "Radio"), 1);
+    cJSON_Delete(p);
+    send_n1mm_antenna(tx, &n1mm, 1402500, 3, "CQ"); /* the same: nothing */
+    EXPECT_NOTHING(200);
+    send_n1mm_antenna(tx, &n1mm, 1402500, 3, "");
+    p = NEXT("Logger");
+    CHECK_MEM_EQ(text(p, "Message"), strlen(text(p, "Message")), "");
+    cJSON_Delete(p);
+
+    plat_socket_close(tx);
+    stop();
+}
+
+/* Without the settings, neither is passed on. */
+static void
+test_logger_settings_off(void)
+{
+    struct plat_addr n1mm;
+    plat_socket probe = PLAT_INVALID_SOCKET;
+    plat_socket tx = PLAT_INVALID_SOCKET;
+    char n1mm_text[PLAT_ADDR_TEXT_MAX];
+    char radio[256];
+
+    plat_addr_parse("127.0.0.1:0", 11, &n1mm);
+    CHECK_INT_EQ(plat_udp_bind(&n1mm, &probe), 0);
+    plat_socket_local_addr(probe, &n1mm);
+    plat_socket_close(probe);
+    plat_addr_format(&n1mm, n1mm_text);
+    CHECK_INT_EQ(plat_udp_open(&n1mm, &tx), 0);
+    snprintf(radio, sizeof(radio),
+             "{\"Radio\":1,\"Sources\":[{\"Type\":\"n1mm\",\"Address\":\"%s\","
+             "\"RadioNr\":1}]}",
+             n1mm_text);
+    if (!start(radio)) {
+        plat_socket_close(tx);
+        return;
+    }
+    connect_up();
+    send_n1mm_antenna(tx, &n1mm, 701000, 1, "");
+    EXPECT_RADIO(7010);
+    WAIT_FOR(three_buttons);
+    send_n1mm_antenna(tx, &n1mm, 701000, 2, "CQ");
+    send_n1mm_antenna(tx, &n1mm, 701000, 3, "Exch");
+    EXPECT_NOTHING(300);
+    plat_socket_close(tx);
+    stop();
+}
+
 static bool
 has_logger(const cJSON *snap)
 {
@@ -1309,6 +1422,8 @@ main(void)
     RUN(test_rigctld_route);
     RUN(test_every_kind_of_button);
     RUN(test_server_notices);
+    RUN(test_logger_antenna_and_caption);
+    RUN(test_logger_settings_off);
     plat_net_fini();
     return test_summary();
 }

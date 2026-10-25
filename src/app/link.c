@@ -484,6 +484,31 @@ app_link_rx_same_as_tx(struct app_link *l, struct oasp_radio_id id)
                                     OASP_CHANGE_ALL, OASP_CHANGE_SAME_AS_TX);
 }
 
+int
+app_link_send_logger(struct app_link *l, struct oasp_radio_id id,
+                     const char *text)
+{
+    if (find_radio(l, id.station, id.radio) == NULL) {
+        return ERR_INVALID;
+    }
+    if (!l->connected) {
+        return ERR_CLOSED;
+    }
+    return oasp_client_send_logger(l->client, id, text);
+}
+
+bool
+app_link_in_band(const struct app_link *l, struct oasp_radio_id id, int khz)
+{
+    const struct radio *r = find_radio((struct app_link *)(uintptr_t)l,
+                                       id.station, id.radio);
+    if (r == NULL || r->configuration.kind != OASP_CONFIGURATION) {
+        return false;
+    }
+    const struct oasp_configuration *c = &r->configuration.u.configuration;
+    return c->upper_khz > 0 && khz >= c->lower_khz && khz <= c->upper_khz;
+}
+
 void
 app_link_track(struct app_link *l, struct oasp_radio_id id,
                struct freq_tracker *tracker)

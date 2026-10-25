@@ -48,6 +48,12 @@ struct n1mm_radio_info {
     int radio_nr;                         /* 0 if missing */
     int64_t freq;                         /* 10 Hz units; 0 if missing */
     bool connected; /* true unless IsConnected is false */
+    /* The logger's antenna number (N1MM's Alt-F9 changes it), if sent. */
+    int antenna;
+    bool have_antenna;
+    /* The caption of the F-key message being sent, if sent; cleaned. */
+    char caption[CAPS_N1MM_CAPTION];
+    bool have_caption;
 };
 
 /*

@@ -63,3 +63,21 @@ numbers follow [Semantic Versioning](https://semver.org/).
   to the same address, and each source follows only its own logger.  The
   settings page offers it, and lists each logger's radios heard separately,
   with how long ago each was heard.
+* Antenna selection for every MOAS configuration: antennas in additive
+  systems are added and taken away; on/off functions are turned off as well
+  as on, and alternate functions toggled with a double-click; next and
+  previous antenna in the band's relative list, and RX = TX, as buttons on
+  the page.
+* What the server tells the user: a refusal (such as "Another client is
+  already connected") is shown, and the server is asked again only after a
+  minute; other server text, logger messages for a radio, and transmit/
+  receive being unknown when the switch is not reachable are shown too.
+* `FollowAntenna` for N1MM and DXLog sources: the logger's antenna changes
+  (N1MM's Alt-F9) step through the band's relative antennas, except with a
+  band change.  `SendFKeyText` for N1MM sources: the F-key caption is
+  passed to the server.  Both are off unless turned on.
+
+### Fixed
+
+* Function buttons on the page lit up when available rather than when on,
+  and were not disabled when the server said they were unavailable.

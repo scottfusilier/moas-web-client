@@ -79,6 +79,39 @@ void freq_feed_report(struct freq_feed feed, int khz);
 void freq_feed_fail(struct freq_feed feed, const char *reason);
 
 /*
+ * Besides frequencies, a logger may say what its operator did on the radio.
+ * Only events from the source being followed are passed on, so that two
+ * loggers never act on one radio.
+ */
+enum freq_event_kind {
+    /* The logger moved to its next antenna (N1MM's Alt-F9); khz is the
+     * radio's frequency in the same report. */
+    FREQ_EVENT_ANTENNA_STEP,
+    /* The logger's message for the radio changed (text; "" when none). */
+    FREQ_EVENT_TEXT,
+};
+
+struct freq_event {
+    enum freq_event_kind kind;
+    int khz;
+    const char *text;
+};
+
+/* Called for each event from the followed source; may not stop sources. */
+typedef void freq_event_fn(struct freq_tracker *tracker,
+                           const struct freq_event *event, void *arg);
+
+/* Where events go (NULL: nowhere, the default). */
+void freq_tracker_on_event(struct freq_tracker *tracker, freq_event_fn *fn,
+                           void *arg);
+
+/*
+ * An event from a source.  Report the frequency that comes with it first,
+ * so that a source that has just come up counts as followed.
+ */
+void freq_feed_event(struct freq_feed feed, const struct freq_event *event);
+
+/*
  * The source to follow: the first, in priority order, that is up.  Returns
  * its index, with its reading in *khz and its name in *name (either may be
  * NULL), or -1 if no source is up.

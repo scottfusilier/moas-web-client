@@ -477,6 +477,29 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
     in a MOAS configuration depends on them.
   * Each with tests against the fake MOAS server, and a fake server
     configuration that uses it.
+  * As built: all of the above.  A click picks its request from what the
+    server said about the button: an additive antenna is added when
+    available and taken away when selected (receive following transmit
+    where it can); any other antenna replaces the selection in its
+    system; a function that is not momentary is turned off when it is on
+    (state 2), and one marked Alternate is toggled with a double-click.
+    The page lights a function when it is on and disables it when the
+    server says unavailable (state 0); before, it lit them when merely
+    available.  Prev / Next and RX = TX are buttons on each radio; RX =
+    TX asks for the transmit antenna exclusively with receive the same.
+  * A refusal (Text asking the client to stop) stays on the page, and the
+    next attempt waits a minute instead of the usual 2 to 30 seconds.
+  * Following a logger's antenna changes is a source setting,
+    `FollowAntenna`, off unless turned on, since it switches relays with
+    no click on the page.  A logger may pick another antenna itself on a
+    band change, which the server already handles from the frequency, so
+    a change is passed on only while the frequency is inside the band the
+    server last sent buttons for.  Only the source a radio is following
+    may change its antenna (the tracker passes on events from that source
+    only).  `SendFKeyText` (N1MM only, also off unless turned on) sends
+    N1MM's F-key caption as a Logger message whenever it changes.
+  * Tried by hand against a `--sim` server: Prev and Next step through the
+    configuration's relative antenna lists.
 * Try every feature from a checklist against a `--sim` server and the real
   switch, DXLog included, with configurations that use additive systems,
   on/off functions and relative antennas.

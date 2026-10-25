@@ -84,6 +84,21 @@ int app_link_step(struct app_link *link, struct oasp_radio_id id, bool next);
  */
 int app_link_rx_same_as_tx(struct app_link *link, struct oasp_radio_id id);
 
+/*
+ * A logger's message for the radio, for the server to show the other
+ * clients serving it.  Text that is not printable ASCII is not sent
+ * (ERR_INVALID).
+ */
+int app_link_send_logger(struct app_link *link, struct oasp_radio_id id,
+                         const char *text);
+
+/*
+ * Whether khz is within the band the server last sent buttons for; false
+ * if it has sent none.
+ */
+bool app_link_in_band(const struct app_link *link, struct oasp_radio_id id,
+                      int khz);
+
 /* Shows a radio's frequency sources in snapshots (NULL: none). */
 void app_link_track(struct app_link *link, struct oasp_radio_id id,
                     struct freq_tracker *tracker);

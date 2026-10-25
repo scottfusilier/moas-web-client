@@ -248,6 +248,94 @@ test_settings(void)
                  "\"dxlog\" or \"rigctld\"");
 }
 
+/* The antenna number and the F-key caption, when sent. */
+static void
+test_parse_antenna_and_caption(void)
+{
+    struct n1mm_radio_info info;
+
+    CHECK_INT_EQ(parse("<RadioInfo><Antenna> 3 </Antenna><FunctionKeyCaption>"
+                       " CQ \x1b</FunctionKeyCaption></RadioInfo>",
+                       &info),
+                 0);
+    CHECK(info.have_antenna && info.antenna == 3);
+    CHECK(info.have_caption);
+    CHECK_MEM_EQ(info.caption, strlen(info.caption), "CQ ?");
+
+    /* Not sent, empty, or not a plain number: no antenna. */
+    CHECK_INT_EQ(parse("<RadioInfo><Freq>1</Freq></RadioInfo>", &info), 0);
+    CHECK(!info.have_antenna && !info.have_caption);
+    CHECK_INT_EQ(parse("<RadioInfo><Antenna></Antenna></RadioInfo>", &info),
+                 0);
+    CHECK(!info.have_antenna);
+    CHECK_INT_EQ(parse("<RadioInfo><Antenna>-1</Antenna></RadioInfo>", &info),
+                 0);
+    CHECK(!info.have_antenna);
+
+    /* An empty caption is a caption: the F-key message ended. */
+    CHECK_INT_EQ(parse("<RadioInfo><FunctionKeyCaption/></RadioInfo>", &info),
+                 0);
+    CHECK(info.have_caption && info.caption[0] == '\0');
+
+    /* A caption too long to keep is left out; the packet still counts. */
+    char p[512];
+    char caption[CAPS_N1MM_CAPTION + 10];
+    memset(caption, 'x', sizeof(caption) - 1);
+    caption[sizeof(caption) - 1] = '\0';
+    snprintf(p, sizeof(p),
+             "<RadioInfo><Freq>700000</Freq><FunctionKeyCaption>%s"
+             "</FunctionKeyCaption></RadioInfo>",
+             caption);
+    CHECK_INT_EQ(parse(p, &info), 0);
+    CHECK(!info.have_caption && info.freq == 700000);
+}
+
+/* FollowAntenna and SendFKeyText: off unless asked for. */
+static void
+test_logger_settings(void)
+{
+    struct freq_source_config c;
+    struct freq_field_error err;
+
+    CHECK_INT_EQ(parse_source("{\"Type\":\"n1mm\",\"FollowAntenna\":true,"
+                              "\"SendFKeyText\":true}",
+                              1, &c, &err),
+                 0);
+    cJSON *json = freq_source_to_json(&c);
+    char *text = json != NULL ? cJSON_PrintUnformatted(json) : NULL;
+    CHECK(text != NULL && strstr(text, "\"FollowAntenna\":true,"
+                                       "\"SendFKeyText\":true") != NULL);
+    cJSON_free(text);
+    cJSON_Delete(json);
+    freq_source_config_fini(&c);
+
+    /* Left out when off. */
+    CHECK_INT_EQ(parse_source("{\"Type\":\"n1mm\",\"FollowAntenna\":false}", 1,
+                              &c, &err),
+                 0);
+    json = freq_source_to_json(&c);
+    text = json != NULL ? cJSON_PrintUnformatted(json) : NULL;
+    CHECK(text != NULL && strstr(text, "FollowAntenna") == NULL &&
+          strstr(text, "SendFKeyText") == NULL);
+    cJSON_free(text);
+    cJSON_Delete(json);
+    freq_source_config_fini(&c);
+
+    CHECK_INT_EQ(parse_source("{\"Type\":\"dxlog\",\"FollowAntenna\":true}", 1,
+                              &c, &err),
+                 0);
+    freq_source_config_fini(&c);
+    CHECK_INT_EQ(parse_source("{\"Type\":\"dxlog\",\"SendFKeyText\":false}", 1,
+                              &c, &err),
+                 ERR_INVALID);
+    CHECK_MEM_EQ(err.message, strlen(err.message),
+                 "SendFKeyText does not apply to dxlog");
+    CHECK_INT_EQ(
+        parse_source("{\"Type\":\"n1mm\",\"FollowAntenna\":1}", 1, &c, &err),
+        ERR_INVALID);
+    CHECK_MEM_EQ(err.field, strlen(err.field), "FollowAntenna");
+}
+
 /* The dxlog type takes the same settings, under its own name. */
 static void
 test_dxlog_settings(void)
@@ -595,6 +683,8 @@ main(void)
     RUN(test_refuses_other_packets);
     RUN(test_settings);
     RUN(test_dxlog_settings);
+    RUN(test_parse_antenna_and_caption);
+    RUN(test_logger_settings);
     RUN(test_listener);
     RUN(test_dxlog_beside_n1mm);
     RUN(test_address_in_use);

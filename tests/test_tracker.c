@@ -161,11 +161,61 @@ test_timer_notices_stale(void)
     loop_destroy(loop);
 }
 
+static int events;
+static int last_event_khz;
+
+static void
+on_event(struct freq_tracker *t, const struct freq_event *e, void *arg)
+{
+    (void)t;
+    (void)arg;
+    events++;
+    last_event_khz = e->khz;
+}
+
+/* Only the source being followed gets its events through. */
+static void
+test_events_from_followed_only(void)
+{
+    struct loop *loop;
+    struct freq_tracker *t;
+    struct freq_feed first;
+    struct freq_feed second;
+    const struct freq_event step = {.kind = FREQ_EVENT_ANTENNA_STEP,
+                                    .khz = 7010};
+
+    CHECK_INT_EQ(loop_create(&loop), 0);
+    CHECK_INT_EQ(freq_tracker_create(loop, NULL, NULL, &t), 0);
+    CHECK_INT_EQ(freq_tracker_add(t, "N1MM radio 1", 0, &first), 0);
+    CHECK_INT_EQ(freq_tracker_add(t, "DXLog radio 1", 0, &second), 0);
+
+    events = 0;
+    freq_feed_event(first, &step); /* nowhere to go yet: harmless */
+    freq_tracker_on_event(t, on_event, NULL);
+    freq_feed_event(first, &step); /* not up, so not followed */
+    CHECK_INT_EQ(events, 0);
+
+    freq_feed_report(second, 7010);
+    freq_feed_event(second, &step);
+    CHECK_INT_EQ(events, 1);
+    CHECK_INT_EQ(last_event_khz, 7010);
+
+    freq_feed_report(first, 14025); /* takes over: higher priority */
+    freq_feed_event(second, &step);
+    CHECK_INT_EQ(events, 1);
+    freq_feed_event(first, &step);
+    CHECK_INT_EQ(events, 2);
+
+    freq_tracker_destroy(t);
+    loop_destroy(loop);
+}
+
 int
 main(void)
 {
     RUN(test_priority_and_failover);
     RUN(test_limits_and_cleaning);
     RUN(test_timer_notices_stale);
+    RUN(test_events_from_followed_only);
     return test_summary();
 }

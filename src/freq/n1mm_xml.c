@@ -9,8 +9,8 @@
 
 #include "freq/n1mm_xml.h"
 
-/* Longest element value kept (the station name is the longest used). */
-#define VALUE_MAX CAPS_N1MM_STATION
+/* Longest element value read. */
+#define VALUE_MAX CAPS_N1MM_VALUE
 
 /* A reading position in the packet. */
 struct cursor {
@@ -262,6 +262,18 @@ n1mm_parse_radio_info(struct str packet, struct n1mm_radio_info *out)
                 return ERR_INVALID;
             }
             out->freq = number;
+        } else if (name_is(name, "Antenna")) {
+            /* Not a plain number (or "-1"): as if it were not sent. */
+            out->have_antenna = parse_number(value, 1000, &number) == 0 &&
+                                str_trim(str_from_cstr(value)).len > 0;
+            out->antenna = out->have_antenna ? (int)number : 0;
+        } else if (name_is(name, "FunctionKeyCaption")) {
+            struct str s = str_trim(str_from_cstr(value));
+            out->have_caption = str_copy_clean(s, out->caption,
+                                               sizeof(out->caption)) == 0;
+            if (!out->have_caption) {
+                out->caption[0] = '\0';
+            }
         } else if (name_is(name, "IsConnected")) {
             out->connected = !str_eq_nocase(str_trim(str_from_cstr(value)),
                                             STR_LIT("false"));

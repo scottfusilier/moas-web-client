@@ -41,6 +41,14 @@ only its own logger's packets.  DXLog does not say when a radio is not
 connected, so a radio that is set up in DXLog but switched off keeps the
 frequency DXLog last showed for it.
 
+Two settings of an N1MM or DXLog source are off unless turned on, on the
+settings section or in the file: `FollowAntenna` steps to the next antenna
+in the band's relative list when the logger moves to its next antenna
+(N1MM's Alt-F9), but not when that comes with a band change, since the
+server picks for the new band itself; and `SendFKeyText` (N1MM only)
+passes the caption of the F-key message being sent to the server, which
+shows it to the other clients serving that radio.
+
 By default the page can be opened only on the computer moas-web-client
 runs on.  `-listen 0.0.0.0:8080` serves it to the network, but the MOAS
 protocol has no login, so anyone who can open the page can switch
