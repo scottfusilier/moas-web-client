@@ -9,7 +9,9 @@
 #include <string.h>
 
 #include "core/buf.h"
+#include "core/json.h"
 #include "fake_moas_server.h"
+#include "oasp/frame.h"
 #include "platform/clock.h"
 
 struct fake_server {
@@ -21,6 +23,10 @@ struct fake_server {
     struct buf received;
     fake_connect_fn *on_connect;
     void *on_connect_arg;
+    fake_message_fn *on_message;
+    void *on_message_arg;
+    size_t parsed; /* bytes of received already handed to on_message */
+    struct oasp_framer framer;
 };
 
 static void
@@ -51,6 +57,25 @@ on_client(struct loop *loop, plat_socket sock, int events, void *arg)
         return;
     }
     buf_append(&s->received, data, got);
+
+    /* Hand each complete message to the test, if it asked. */
+    while (s->on_message != NULL && s->client != PLAT_INVALID_SOCKET) {
+        size_t start;
+        size_t end;
+        const char *base = s->received.data + s->parsed;
+        if (oasp_frame_next(&s->framer, base, s->received.len - s->parsed,
+                            &start, &end) != 0)
+        {
+            break;
+        }
+        cJSON *msg = NULL;
+        if (json_parse(str_make(base + start, end - start), &msg) == 0) {
+            s->on_message(s, msg, s->on_message_arg);
+            cJSON_Delete(msg);
+        }
+        s->parsed += end;
+        oasp_framer_reset(&s->framer);
+    }
 }
 
 static void
@@ -67,6 +92,8 @@ on_listener(struct loop *loop, plat_socket sock, int events, void *arg)
     s->client = client;
     s->accepted++;
     buf_clear(&s->received);
+    s->parsed = 0;
+    oasp_framer_reset(&s->framer);
     loop_watch(loop, client, LOOP_READ, on_client, s);
     if (s->on_connect != NULL) {
         s->on_connect(s, s->on_connect_arg);
@@ -104,6 +131,9 @@ fake_server_create(struct loop *loop, struct fake_server **out)
 void
 fake_server_destroy(struct fake_server *s)
 {
+    if (s == NULL) {
+        return;
+    }
     drop(s);
     loop_unwatch(s->loop, s->listener);
     plat_socket_close(s->listener);
@@ -116,6 +146,13 @@ fake_server_on_connect(struct fake_server *s, fake_connect_fn *fn, void *arg)
 {
     s->on_connect = fn;
     s->on_connect_arg = arg;
+}
+
+void
+fake_server_on_message(struct fake_server *s, fake_message_fn *fn, void *arg)
+{
+    s->on_message = fn;
+    s->on_message_arg = arg;
 }
 
 const struct plat_addr *

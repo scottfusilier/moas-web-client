@@ -1,0 +1,1 @@
+{"_comment": "x", "Radios": [{"_comment": "y", "Radio": 1, "Sources": [{"Type": "rigctld", "Address": "127.0.0.1:4532", "PollMilliseconds": 50, "TimeoutSeconds": 1}]}], "RecentServers": ["10.0.0.2:12059"]}

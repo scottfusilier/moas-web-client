@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOAS Client</title>
+<style>
+  :root {
+    --bg: #eef0f3; --panel: #ffffff; --text: #1b2230; --muted: #5d6778;
+    --line: #cdd3dc; --cell: #f6f7f9; --cell-hover: #e9edf3;
+    --accent: #1f5fd0; --on-accent: #ffffff;
+    --tx: #c2410c; --tx-bg: #fdeee6; --rx: #15803d; --rx-bg: #e6f5ec;
+    --warn-bg: #fff4d6; --warn-text: #6b4a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1b2029; --text: #e6e9ef; --muted: #98a2b3;
+      --line: #343c4a; --cell: #242b37; --cell-hover: #2e3746;
+      --accent: #4f8dff; --on-accent: #0b1220;
+      --tx: #ff9466; --tx-bg: #3a2318; --rx: #5fd08a; --rx-bg: #17301f;
+      --warn-bg: #3b3012; --warn-text: #f2d98a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px;
+    padding: 12px 16px;
+  }
+  h1 { font-size: 18px; margin: 0; }
+  #server { color: var(--muted); }
+  #notice {
+    margin: 0 16px 12px; padding: 10px 12px; border-radius: 8px;
+    background: var(--warn-bg); color: var(--warn-text);
+  }
+  #notice:empty { display: none; }
+  main {
+    display: grid; gap: 16px; padding: 0 16px 24px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  }
+  .radio {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; min-width: 0;
+  }
+  .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .head h2 { font-size: 17px; margin: 0; }
+  .band { color: var(--muted); }
+  .radio.transmit { border-color: var(--tx); box-shadow: 0 0 0 2px var(--tx); }
+  .keying {
+    margin-left: auto; font-size: 12px; font-weight: 700; letter-spacing: .06em;
+    padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
+  }
+  .keying:empty { display: none; }
+  .keying.transmit { background: var(--tx); border-color: var(--tx); color: var(--panel); }
+  .keying.inhibited { background: var(--warn-bg); border-color: var(--warn-text); color: var(--warn-text); }
+  .sources { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: 13px; color: var(--muted); }
+  .sources:empty { display: none; }
+  .src::before {
+    content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 6px; vertical-align: 1px; border: 1px solid var(--muted);
+  }
+  .src.up::before { background: var(--rx); border-color: var(--rx); }
+  .src.error::before { background: var(--tx); border-color: var(--tx); }
+  .src.following { color: var(--text); font-weight: 600; }
+  .using { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 0 12px; min-height: 24px; }
+  .using b { font-weight: 600; }
+  .chip {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+    padding: 1px 6px; border-radius: 4px; margin-right: 6px; vertical-align: 1px;
+  }
+  .chip.tx { background: var(--tx-bg); color: var(--tx); border: 1px solid var(--tx); }
+  .chip.rx { background: var(--rx-bg); color: var(--rx); border: 1px solid var(--rx); }
+  .grid { display: grid; gap: 8px; }
+  .cell {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-width: 0; padding: 6px 4px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--cell); color: var(--text);
+    font: inherit; font-weight: 600; text-align: center; cursor: pointer;
+    overflow-wrap: anywhere; touch-action: manipulation;
+  }
+  .cell:hover:not(:disabled) { background: var(--cell-hover); }
+  .cell:focus-visible, .mode button:focus-visible, .bands button:focus-visible, .freq button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  .cell:disabled { opacity: .38; cursor: not-allowed; }
+  .cell .chip { margin: 0 2px; }
+  .cell .hint { font-size: 11px; font-weight: 500; color: var(--muted); }
+  .cell.both { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .cell.both:hover:not(:disabled) { background: var(--accent); }
+  .cell.both .chip { background: transparent; color: inherit; border-color: currentColor; }
+  .cell.txsel { background: var(--tx-bg); border-color: var(--tx); }
+  .cell.rxsel { background: var(--rx-bg); border-color: var(--rx); }
+  .cell.fn { border-radius: 999px; font-weight: 500; background: transparent; }
+  .cell.fn.lit { border-color: var(--accent); color: var(--accent); }
+  .controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 14px;
+  }
+  .mode, .bands { display: inline-flex; }
+  .mode button, .bands button, .freq button {
+    font: inherit; color: var(--text); background: var(--cell);
+    border: 1px solid var(--line); padding: 6px 10px; cursor: pointer;
+  }
+  .mode button:first-child, .bands button:first-child { border-radius: 6px 0 0 6px; }
+  .mode button:last-child, .bands button:last-child { border-radius: 0 6px 6px 0; }
+  .mode button + button, .bands button + button { border-left: 0; }
+  .mode button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .freq { display: inline-flex; align-items: center; gap: 6px; }
+  .freq input {
+    font: inherit; width: 7.5em; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  }
+  .freq button { border-radius: 6px; }
+  .where { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+  .linkish {
+    font: inherit; color: var(--accent); background: none; border: 0; padding: 0;
+    text-decoration: underline; cursor: pointer;
+  }
+  #gear {
+    font: inherit; font-size: 14px; color: var(--text); background: var(--cell);
+    border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer;
+  }
+  #gear[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  #gear:focus-visible, #settings :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  #settings {
+    margin: 0 16px 16px; padding: 14px 16px; border-radius: 12px;
+    background: var(--panel); border: 1px solid var(--line);
+  }
+  #settings h3 { font-size: 14px; margin: 14px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  #settings h3:first-child { margin-top: 0; }
+  .banner { padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; background: var(--warn-bg); color: var(--warn-text); }
+  .row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; }
+  .field { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
+  .field input, .field select {
+    font: inherit; font-size: 14px; color: var(--text); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0;
+  }
+  .field input.wide { width: 15em; }
+  .field input.num { width: 5em; }
+  .field input.invalid, .field select.invalid { border-color: var(--tx); box-shadow: 0 0 0 1px var(--tx); }
+  .small, .s-btn {
+    font: inherit; font-size: 13px; color: var(--text); background: var(--cell);
+    border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; cursor: pointer;
+  }
+  .s-btn:disabled { opacity: .4; cursor: default; }
+  .s-radio { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  .s-radio > .row:first-child { margin-bottom: 8px; }
+  .s-src { padding: 8px 0 8px 10px; border-left: 3px solid var(--line); margin: 6px 0; }
+  .s-src .kind { font-weight: 600; min-width: 4.5em; align-self: center; color: var(--text); }
+  .heard { margin-top: 6px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .heard button {
+    font: inherit; font-size: 12px; color: var(--text); background: var(--cell);
+    border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; cursor: pointer;
+  }
+  .heard button.picked { border-color: var(--rx); color: var(--rx); }
+  .test-result { font-size: 12px; align-self: center; }
+  .spacer { flex: 1; }
+  .footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .footer .msg { flex: 1 1 16em; font-size: 13px; color: var(--muted); }
+  .footer .msg.error { color: var(--tx); }
+  .primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .muted { color: var(--muted); font-size: 12px; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    max-width: calc(100% - 32px); padding: 10px 14px; border-radius: 8px;
+    background: var(--text); color: var(--bg); display: none;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>MOAS</h1>
+  <span id="server"></span>
+  <span class="where">
+    <span id="where"></span>
+    <button id="gear" type="button" aria-expanded="false" aria-controls="settings" hidden>⚙ Settings</button>
+  </span>
+</header>
+<section id="settings" aria-label="Settings" hidden></section>
+<div id="notice" role="status"></div>
+<main id="radios"></main>
+<div id="toast" role="alert"></div>
+
+<script>
+"use strict";
+
+const BANDS = [[1800, "160m"], [3500, "80m"], [5250, "60m"], [7000, "40m"], [10100, "30m"],
+               [14000, "20m"], [18068, "17m"], [21000, "15m"], [24890, "12m"], [28000, "10m"], [50000, "6m"]];
+const QUICK = [[1800, "160"], [3500, "80"], [7000, "40"], [14000, "20"], [21000, "15"], [28000, "10"]];
+
+const panels = new Map();   // "station/radio" -> panel
+let snapshot = null;
+let streamUp = false;
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function bandName(lower, upper) {
+  const range = lower + "–" + upper + " kHz";
+  for (const [edge, name] of BANDS) {
+    if (edge >= lower && edge <= upper) return name + " · " + range;
+  }
+  return range;
+}
+
+let toastTimer = 0;
+function toast(message) {
+  const node = document.getElementById("toast");
+  node.textContent = message;
+  node.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { node.style.display = "none"; }, 5000);
+}
+
+async function post(path, body) {
+  try {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) toast((await response.text()).trim() || "Request failed (" + response.status + ")");
+  } catch (err) {
+    toast("Could not reach the client program.");
+  }
+}
+
+function makePanel(radio) {
+  const id = { station: radio.station, radio: radio.radio };
+  const panel = { id, rxOnly: false };
+
+  const root = el("section", "radio");
+  const head = el("div", "head");
+  head.append(el("h2", "", "Radio " + radio.radio));
+  panel.band = el("span", "band");
+  panel.keying = el("span", "keying");
+  panel.keying.setAttribute("role", "status");
+  head.append(panel.band, panel.keying);
+  panel.root = root;
+  panel.sources = el("div", "sources");
+
+  const using = el("div", "using");
+  const txLine = el("span");
+  txLine.append(el("span", "chip tx", "TX"));
+  panel.tx = el("b");
+  txLine.append(panel.tx);
+  const rxLine = el("span");
+  rxLine.append(el("span", "chip rx", "RX"));
+  panel.rx = el("b");
+  rxLine.append(panel.rx);
+  using.append(txLine, rxLine);
+
+  panel.grid = el("div", "grid");
+
+  const controls = el("div", "controls");
+
+  const modeLabel = el("span", "", "A click selects ");
+  const mode = el("span", "mode");
+  mode.setAttribute("role", "group");
+  const bothButton = el("button", "on", "TX + RX");
+  const rxButton = el("button", "", "RX only");
+  bothButton.type = rxButton.type = "button";
+  const setMode = (rxOnly) => {
+    panel.rxOnly = rxOnly;
+    bothButton.classList.toggle("on", !rxOnly);
+    rxButton.classList.toggle("on", rxOnly);
+    bothButton.setAttribute("aria-pressed", String(!rxOnly));
+    rxButton.setAttribute("aria-pressed", String(rxOnly));
+  };
+  bothButton.addEventListener("click", () => setMode(false));
+  rxButton.addEventListener("click", () => setMode(true));
+  setMode(false);
+  mode.append(bothButton, rxButton);
+  const modeGroup = el("span");
+  modeGroup.append(modeLabel, mode);
+
+  const form = el("form", "freq");
+  const label = el("label", "", "Frequency (kHz) ");
+  panel.input = el("input");
+  panel.input.type = "number";
+  panel.input.min = "1";
+  panel.input.max = "500000";
+  panel.input.inputMode = "numeric";
+  label.append(panel.input);
+  const setButton = el("button", "", "Set");
+  setButton.type = "submit";
+  form.append(label, setButton);
+  const sendFrequency = (kHz) => post("/api/frequency", { ...id, frequency: kHz });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const kHz = Math.round(Number(panel.input.value));
+    if (kHz >= 1) sendFrequency(kHz);
+  });
+
+  const bands = el("span", "bands");
+  bands.setAttribute("role", "group");
+  bands.setAttribute("aria-label", "Band");
+  for (const [kHz, name] of QUICK) {
+    const button = el("button", "", name);
+    button.type = "button";
+    button.title = "Set " + kHz + " kHz";
+    button.addEventListener("click", () => { panel.input.value = kHz; sendFrequency(kHz); });
+    bands.append(button);
+  }
+
+  controls.append(modeGroup, form, bands);
+  root.append(head, panel.sources, using, panel.grid, controls);
+  document.getElementById("radios").append(root);
+  return panel;
+}
+
+function clickAntenna(panel, button, forceRxOnly) {
+  const rxOnly = forceRxOnly || panel.rxOnly;
+  const tx = !rxOnly && button.tx > 0;
+  const rx = button.rx > 0;
+  if (!tx && !rx) return;
+  post("/api/select", { ...panel.id, antenna: button.id, tx, rx });
+}
+
+function makeCell(panel, button, enabled) {
+  const cell = el("button", "cell");
+  cell.type = "button";
+  cell.style.gridRow = String(button.row + 1);
+  cell.style.gridColumn = String(button.column + 1);
+  cell.title = button.longName || button.name;
+  cell.append(el("span", "", button.name));
+
+  if (button.kind === "function") {
+    cell.classList.add("fn");
+    if (button.state === 1) cell.classList.add("lit");
+    cell.disabled = !enabled;
+    cell.addEventListener("click", () => post("/api/function", { ...panel.id, function: button.id }));
+    return cell;
+  }
+
+  const txSelected = button.tx === 2, rxSelected = button.rx === 2;
+  if (txSelected && rxSelected) cell.classList.add("both");
+  else if (txSelected) cell.classList.add("txsel");
+  else if (rxSelected) cell.classList.add("rxsel");
+
+  if (txSelected || rxSelected) {
+    const chips = el("span");
+    if (txSelected) chips.append(el("span", "chip tx", "TX"));
+    if (rxSelected) chips.append(el("span", "chip rx", "RX"));
+    cell.append(chips);
+  } else if (button.tx === 0 && button.rx > 0) {
+    cell.append(el("span", "hint", "receive only"));
+  }
+
+  cell.disabled = !enabled || (button.tx === 0 && button.rx === 0);
+  cell.addEventListener("click", () => clickAntenna(panel, button, false));
+  // A right-click selects for receive only, whatever the mode switch says.
+  cell.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    if (!cell.disabled) clickAntenna(panel, button, true);
+  });
+  return cell;
+}
+
+const KEYING = { transmit: "TRANSMIT", receive: "RECEIVE", inhibited: "INHIBITED" };
+const SOURCE_STATE ={ waiting: "waiting", stale: "no recent reading", error: "not available" };
+
+// updateSources lists the radio's frequency sources, highest priority first,
+// and marks the one whose frequency the server has.
+function updateSources(panel, radio) {
+  const items = [];
+  if (radio.sources.length > 0 || radio.origin === "manual") {
+    const from = radio.origin === "manual" ? "typed in" : (radio.origin || "nothing yet");
+    items.push(el("span", "", "Frequency from: " + from));
+  }
+  for (const source of radio.sources) {
+    const following = source.state === "up" && source.name === radio.origin;
+    const item = el("span", "src " + source.state + (following ? " following" : ""));
+    const detail = source.state === "up" ? source.kHz + " kHz" : SOURCE_STATE[source.state] || source.state;
+    item.textContent = source.name + " · " + detail;
+    if (source.error) item.title = source.error;
+    items.push(item);
+  }
+  panel.sources.replaceChildren(...items);
+}
+
+function updatePanel(panel, radio, snap) {
+  updateSources(panel, radio);
+  const hasBand = radio.upper > 0;
+  panel.band.textContent = hasBand ? bandName(radio.lower, radio.upper)
+    : (snap.connected ? "no band yet: set a frequency" : "");
+  const keying = snap.connected ? radio.keying : "";
+  panel.keying.textContent = KEYING[keying] || "";
+  panel.keying.className = "keying " + keying;
+  panel.keying.title = keying === "inhibited" ? "Another radio is transmitting" : "";
+  panel.root.classList.toggle("transmit", keying === "transmit");
+  panel.tx.textContent = radio.tx || "none";
+  panel.rx.textContent = radio.rx || "none";
+  if (radio.frequency > 0 && document.activeElement !== panel.input) panel.input.value = radio.frequency;
+
+  // Use the server's grid, widened if a button falls outside it.
+  let rows = snap.rows, columns = snap.columns;
+  for (const b of radio.buttons) {
+    rows = Math.max(rows, b.row + 1);
+    columns = Math.max(columns, b.column + 1);
+  }
+  panel.grid.style.gridTemplateColumns = "repeat(" + columns + ", minmax(0, 1fr))";
+  panel.grid.style.gridTemplateRows = "repeat(" + rows + ", minmax(52px, auto))";
+  panel.grid.replaceChildren(...radio.buttons.map((b) => makeCell(panel, b, snap.connected)));
+}
+
+function render() {
+  const notice = document.getElementById("notice");
+  if (!streamUp) {
+    notice.textContent = "Lost contact with the client program. Retrying…";
+  } else if (snapshot && !snapshot.connected) {
+    notice.textContent = "Not connected to the MOAS server at " + snapshot.address +
+      (snapshot.error ? " (" + snapshot.error + ")" : "") + ". Retrying…";
+    if (settingsAllowed && !settingsOpen()) {
+      const link = el("button", "linkish", "Open settings");
+      link.type = "button";
+      link.addEventListener("click", openSettings);
+      notice.append(" ", link);
+    }
+  } else {
+    notice.textContent = "";
+  }
+  if (!snapshot) return;
+
+  document.getElementById("server").textContent = snapshot.connected ? (snapshot.server || snapshot.address) : "";
+  const station = snapshot.radios.length > 0 ? " · station " + snapshot.radios[0].station : "";
+  document.getElementById("where").textContent = snapshot.address + station;
+  const live = streamUp ? snapshot : { ...snapshot, connected: false };
+  // Saved settings can change which radios are served.
+  const keys = new Set(snapshot.radios.map((radio) => radio.station + "/" + radio.radio));
+  for (const [key, panel] of panels) {
+    if (!keys.has(key)) {
+      panel.root.remove();
+      panels.delete(key);
+    }
+  }
+  for (const radio of snapshot.radios) {
+    const key = radio.station + "/" + radio.radio;
+    if (!panels.has(key)) panels.set(key, makePanel(radio));
+    updatePanel(panels.get(key), radio, live);
+  }
+}
+
+// ---- Settings ----
+//
+// The section edits a copy (draft) of the settings file.  Typing changes only
+// the draft; nothing reaches moasweb until Save.  Field names follow the
+// file, and each input's data-field is the path moasweb uses to point at a
+// problem, such as "Radios.0.Sources.1.Address".
+
+const DEFAULT_ADDRESS = { n1mm: "127.0.0.1:12060", rigctld: "127.0.0.1:4532" };
+let settingsAllowed = false;
+let cfg = null;        // while open: { view, draft, advanced, dirty, heard, tests }
+let heardTimer = 0;
+
+function settingsOpen() { return cfg !== null; }
+
+async function fetchSettings() {
+  const response = await fetch("/api/settings", { cache: "no-store" });
+  if (response.status === 403 || response.status === 404) return null;
+  if (!response.ok) throw new Error((await response.text()).trim());
+  return response.json();
+}
+
+async function openSettings() {
+  let view;
+  try {
+    view = await fetchSettings();
+  } catch (err) {
+    toast("Could not read the settings: " + err.message);
+    return;
+  }
+  if (!view) return;
+  const draft = JSON.parse(JSON.stringify(view.settings));
+  draft.Radios = draft.Radios || [];
+  for (const radio of draft.Radios) radio.Sources = radio.Sources || [];
+  cfg = { view, draft, advanced: false, dirty: false, heard: {}, tests: {} };
+  if (view.problem && view.problem.Field && isAdvancedField(view.problem.Field)) cfg.advanced = true;
+  const section = document.getElementById("settings");
+  section.hidden = false;
+  document.getElementById("gear").setAttribute("aria-expanded", "true");
+  renderSettings();
+  if (view.problem && view.problem.Field) markInvalid(view.problem.Field);
+  pollHeard();
+  render();
+}
+
+function closeSettings() {
+  if (cfg && cfg.dirty && !confirm("Discard the changes you made to the settings?")) return;
+  cfg = null;
+  clearTimeout(heardTimer);
+  document.getElementById("settings").hidden = true;
+  document.getElementById("settings").replaceChildren();
+  document.getElementById("gear").setAttribute("aria-expanded", "false");
+  render();
+}
+
+function isAdvancedField(field) {
+  return /^(Listen|Rows|Columns)$/.test(field) || /\.(StationName|TimeoutSeconds|PollMilliseconds)$/.test(field);
+}
+
+async function pollHeard() {
+  clearTimeout(heardTimer);
+  if (!cfg) return;
+  try {
+    const response = await fetch("/api/n1mm-heard", { cache: "no-store" });
+    if (response.ok && cfg) {
+      cfg.heard = await response.json();
+      updateHeard();
+    }
+  } catch (err) { /* shown as nothing heard */ }
+  if (cfg) heardTimer = setTimeout(pollHeard, 1500);
+}
+
+// input makes a labelled input bound to obj[key].
+function input(label, obj, key, field, options = {}) {
+  const wrap = el("label", "field");
+  wrap.append(label);
+  const box = el("input", options.className || "");
+  box.type = options.type || "text";
+  box.dataset.field = field;
+  if (options.placeholder) box.placeholder = options.placeholder;
+  if (options.type === "number") {
+    box.min = options.min ?? "0";
+    box.step = options.step || "1";
+  }
+  const value = obj[key];
+  box.value = value === undefined || value === null || (options.type === "number" && value === 0 && options.blankZero) ? "" : value;
+  box.addEventListener("input", () => {
+    if (options.type === "number") {
+      const n = box.value === "" ? 0 : Number(box.value);
+      obj[key] = options.step && options.step !== "1" ? n : Math.trunc(n);
+    } else {
+      obj[key] = box.value;
+    }
+    cfg.dirty = true;
+    box.classList.remove("invalid");
+    if (options.onInput) options.onInput();
+  });
+  wrap.append(box);
+  return wrap;
+}
+
+function smallButton(text, title, action, disabled = false) {
+  const button = el("button", "s-btn", text);
+  button.type = "button";
+  if (title) { button.title = title; button.setAttribute("aria-label", title); }
+  button.disabled = disabled;
+  button.addEventListener("click", action);
+  return button;
+}
+
+// change applies a structural edit, such as adding a radio, and redraws.
+function change(edit) {
+  edit();
+  cfg.dirty = true;
+  renderSettings();
+}
+
+function newSource(type, radioNumber) {
+  return type === "n1mm"
+    ? { Type: "n1mm", Address: DEFAULT_ADDRESS.n1mm, RadioNr: radioNumber }
+    : { Type: "rigctld", Address: DEFAULT_ADDRESS.rigctld };
+}
+
+function renderSettings() {
+  const section = document.getElementById("settings");
+  const { view, draft } = cfg;
+  const parts = [];
+
+  if (!view.exists) {
+    parts.push(el("div", "banner", "There is no settings file yet. Check these settings and press Save to create " + view.path + "."));
+  }
+  if (view.problem && view.problem.Field) {
+    parts.push(el("div", "banner", "The settings file has a problem: " + view.problem.Message +
+      ". Fix it here and save, or edit the file by hand."));
+  } else if (view.problem) {
+    parts.push(el("div", "banner", "The settings file cannot be read: " + view.problem.Message +
+      ". Shown here are the settings in use instead; saving replaces the file with them. To keep the file, fix it by hand and open the settings again."));
+  }
+  if (view.comments) {
+    parts.push(el("div", "banner", "The settings file has _comment notes in it. Saving from here keeps the settings but not the notes."));
+  }
+  if (view.overrides.length > 0) {
+    parts.push(el("div", "banner", "moasweb was started with " + view.overrides.join(", ") +
+      ", which overrode the file. Saving puts what is shown here into effect and into the file."));
+  }
+
+  // Connection
+  parts.push(el("h3", "", "Connection"));
+  const connection = el("div", "row");
+  const server = input("MOAS server (host:port)", draft, "Server", "Server", { className: "wide", placeholder: "127.0.0.1:12059" });
+  connection.append(server);
+  const recent = (draft.RecentServers || []).filter((s) => s !== draft.Server);
+  if (recent.length > 0) {
+    const wrap = el("label", "field", "Used before");
+    const pick = el("select");
+    pick.append(el("option", "", "choose…"));
+    for (const s of recent) pick.append(el("option", "", s));
+    pick.addEventListener("change", () => {
+      if (pick.selectedIndex > 0) change(() => { draft.Server = pick.value; });
+    });
+    wrap.append(pick);
+    connection.append(wrap);
+  }
+  connection.append(input("Station", draft, "Station", "Station", { type: "number", className: "num", min: "1" }));
+  parts.push(connection);
+
+  // Radios
+  const radiosHead = el("div", "row");
+  radiosHead.style.marginTop = "8px";
+  const title = el("h3", "", "Radios");
+  title.style.flex = "1";
+  radiosHead.append(title, smallButton("+ Add radio", "", () => change(() => {
+    const used = new Set(draft.Radios.map((r) => r.Radio));
+    let number = 1;
+    while (used.has(number)) number++;
+    draft.Radios.push({ Radio: number, Sources: [newSource("n1mm", number)] });
+  })));
+  parts.push(radiosHead);
+
+  draft.Radios.forEach((radio, i) => parts.push(renderRadio(radio, i)));
+  if (draft.Radios.length === 0) parts.push(el("div", "muted", "Add at least one radio."));
+
+  // Advanced
+  const advancedToggle = el("label", "field");
+  advancedToggle.style.flexDirection = "row";
+  advancedToggle.style.alignItems = "center";
+  advancedToggle.style.gap = "6px";
+  advancedToggle.style.marginTop = "6px";
+  const check = el("input");
+  check.type = "checkbox";
+  check.checked = cfg.advanced;
+  check.addEventListener("change", () => { cfg.advanced = check.checked; renderSettings(); });
+  advancedToggle.append(check, "Show advanced options");
+  parts.push(advancedToggle);
+  if (cfg.advanced) {
+    parts.push(el("h3", "", "Advanced"));
+    const advanced = el("div", "row");
+    advanced.append(
+      input("Page address (host:port)", draft, "Listen", "Listen", { className: "wide", placeholder: "127.0.0.1:8080" }),
+      input("Grid rows", draft, "Rows", "Rows", { type: "number", className: "num", min: "1" }),
+      input("Grid columns", draft, "Columns", "Columns", { type: "number", className: "num", min: "1" }),
+    );
+    parts.push(advanced);
+    parts.push(el("div", "muted", "The page is served at " + view.listen + " now. A new page address takes effect when moasweb is restarted. " +
+      "An address other than 127.0.0.1 lets other computers on your network switch antennas (but not change settings)."));
+  }
+
+  // Footer
+  const footer = el("div", "footer");
+  cfg.message = el("span", "msg", "Saving reconnects to the server if the connection settings changed.");
+  const file = el("div", "muted", "File: " + view.path);
+  file.style.flexBasis = "100%";
+  const cancel = el("button", "small", "Cancel");
+  cancel.type = "button";
+  cancel.addEventListener("click", closeSettings);
+  const save = el("button", "small primary", "Save");
+  save.type = "button";
+  save.addEventListener("click", saveSettings);
+  footer.append(cfg.message, cancel, save, file);
+  parts.push(footer);
+
+  section.replaceChildren(...parts);
+  updateHeard();
+}
+
+function renderRadio(radio, i) {
+  const { draft } = cfg;
+  const box = el("div", "s-radio");
+  const head = el("div", "row");
+  head.append(input("MOAS radio", radio, "Radio", "Radios." + i + ".Radio", { type: "number", className: "num", min: "1" }));
+  head.append(el("span", "spacer"));
+  head.append(smallButton("Remove radio", "Remove radio " + radio.Radio, () => change(() => draft.Radios.splice(i, 1))));
+  box.append(head);
+
+  box.append(el("div", "muted", radio.Sources.length === 0
+    ? "No frequency sources: the frequency is only typed on the page."
+    : "Frequency sources, first one that is working wins:"));
+  radio.Sources.forEach((src, j) => box.append(renderSource(radio, i, src, j)));
+
+  const add = el("div", "row");
+  add.style.marginTop = "6px";
+  add.append(
+    smallButton("+ N1MM", "Add an N1MM source", () => change(() => radio.Sources.push(newSource("n1mm", radio.Radio)))),
+    smallButton("+ rigctld", "Add a rigctld (hamlib) source", () => change(() => radio.Sources.push(newSource("rigctld")))),
+  );
+  box.append(add);
+  return box;
+}
+
+function renderSource(radio, i, src, j) {
+  const path = "Radios." + i + ".Sources." + j + ".";
+  const box = el("div", "s-src");
+  const row = el("div", "row");
+  row.append(el("span", "kind", src.Type === "n1mm" ? "N1MM" : src.Type === "rigctld" ? "rigctld" : src.Type));
+
+  if (src.Type === "n1mm") {
+    row.append(
+      input("Listen on (host:port)", src, "Address", path + "Address", { className: "wide", placeholder: DEFAULT_ADDRESS.n1mm, onInput: updateHeard }),
+      input("N1MM radio", src, "RadioNr", path + "RadioNr", { type: "number", className: "num", min: "1", onInput: updateHeard }),
+    );
+    if (cfg.advanced) {
+      row.append(
+        input("N1MM station name", src, "StationName", path + "StationName", { placeholder: "any", onInput: updateHeard }),
+        input("Timeout (s)", src, "TimeoutSeconds", path + "TimeoutSeconds", { type: "number", className: "num", step: "0.5", placeholder: "never", blankZero: true }),
+      );
+    }
+  } else {
+    row.append(input("rigctld at (host:port)", src, "Address", path + "Address", { className: "wide", placeholder: DEFAULT_ADDRESS.rigctld }));
+    if (cfg.advanced) {
+      row.append(
+        input("Timeout (s)", src, "TimeoutSeconds", path + "TimeoutSeconds", { type: "number", className: "num", step: "0.5", placeholder: "2", blankZero: true }),
+        input("Poll (ms)", src, "PollMilliseconds", path + "PollMilliseconds", { type: "number", className: "num", min: "50", placeholder: "250", blankZero: true }),
+      );
+    }
+    const result = el("span", "test-result");
+    const key = i + "/" + j;
+    if (cfg.tests[key]) result.textContent = cfg.tests[key];
+    row.append(smallButton("Test", "Read the frequency from this rigctld once", async () => {
+      result.textContent = "reading…";
+      try {
+        const response = await fetch("/api/rigctld-test", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: src.Address || DEFAULT_ADDRESS.rigctld }),
+        });
+        const body = await response.json();
+        result.textContent = response.ok ? "✓ " + body.kHz + " kHz" : "✗ " + body.Message;
+      } catch (err) {
+        result.textContent = "✗ could not reach moasweb";
+      }
+      if (cfg) cfg.tests[key] = result.textContent;
+    }), result);
+  }
+
+  row.append(el("span", "spacer"));
+  row.append(
+    smallButton("↑", "Higher priority", () => change(() => radio.Sources.splice(j - 1, 2, radio.Sources[j], radio.Sources[j - 1])), j === 0),
+    smallButton("↓", "Lower priority", () => change(() => radio.Sources.splice(j, 2, radio.Sources[j + 1], radio.Sources[j])), j === radio.Sources.length - 1),
+    smallButton("✕", "Remove this source", () => change(() => radio.Sources.splice(j, 1))),
+  );
+  box.append(row);
+
+  if (src.Type === "n1mm") {
+    const heard = el("div", "heard");
+    heard.dataset.radio = String(i);
+    heard.dataset.source = String(j);
+    box.append(heard);
+  }
+  return box;
+}
+
+// updateHeard fills in, under each N1MM source, the radios N1MM is actually
+// reporting on that address.  A click on one picks it.
+function updateHeard() {
+  if (!cfg) return;
+  for (const line of document.querySelectorAll("#settings .heard")) {
+    const src = cfg.draft.Radios[Number(line.dataset.radio)].Sources[Number(line.dataset.source)];
+    const address = (src.Address || DEFAULT_ADDRESS.n1mm).trim();
+    const heard = cfg.heard[address];
+    const items = [];
+    if (heard === undefined) {
+      items.push("Not listening on " + address + " yet; save to start.");
+    } else if (heard.length === 0) {
+      items.push("Nothing heard from N1MM on " + address + " yet.");
+    } else {
+      items.push("Heard:");
+      const stations = new Set(heard.map((h) => h.stationName));
+      for (const h of heard) {
+        const age = Math.round((Date.now() - Date.parse(h.at)) / 1000);
+        const name = (stations.size > 1 && h.stationName ? h.stationName + " " : "") + "radio " + h.radioNr;
+        const state = h.connected ? h.kHz + " kHz" : "not connected";
+        const chip = el("button", "", name + ": " + state + (age > 30 ? " (" + age + " s ago)" : ""));
+        chip.type = "button";
+        chip.title = "Follow this radio";
+        const picked = src.RadioNr === h.radioNr && (!src.StationName || src.StationName.toLowerCase() === h.stationName.toLowerCase());
+        chip.classList.toggle("picked", picked);
+        chip.addEventListener("click", () => {
+          src.RadioNr = h.radioNr;
+          if (stations.size > 1) src.StationName = h.stationName;
+          cfg.dirty = true;
+          renderSettings();
+        });
+        items.push(chip);
+      }
+    }
+    line.replaceChildren(...items);
+  }
+}
+
+function markInvalid(field) {
+  if (isAdvancedField(field) && !cfg.advanced) {
+    cfg.advanced = true;
+    renderSettings();
+  }
+  const target = document.querySelector('#settings [data-field="' + field + '"]');
+  if (target) {
+    target.classList.add("invalid");
+    target.focus();
+  }
+}
+
+function showSettingsMessage(text, isError) {
+  if (!cfg || !cfg.message) return;
+  cfg.message.textContent = text;
+  cfg.message.classList.toggle("error", isError);
+}
+
+async function saveSettings() {
+  for (const node of document.querySelectorAll("#settings .invalid")) node.classList.remove("invalid");
+  showSettingsMessage("Saving…", false);
+  let response, body;
+  try {
+    response = await fetch("/api/settings", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: cfg.draft, version: cfg.view.version }),
+    });
+    body = await response.json();
+  } catch (err) {
+    showSettingsMessage("Could not reach moasweb; nothing was saved.", true);
+    return;
+  }
+  if (!cfg) return;
+  if (response.ok) {
+    cfg.dirty = false;
+    closeSettings();
+    toast(body.restart ? "Settings saved. Restart moasweb to serve the page at its new address." : "Settings saved.");
+    return;
+  }
+  if (response.status === 409) {
+    showSettingsMessage(body.Message + ". Cancel and open the settings again to see the file as it is now; your changes here will be lost.", true);
+    return;
+  }
+  showSettingsMessage((body && body.Message) || "Not saved.", true);
+  if (body && body.Field) markInvalid(body.Field);
+}
+
+document.getElementById("gear").addEventListener("click", () => {
+  if (settingsOpen()) closeSettings(); else openSettings();
+});
+
+// Show the settings button only where settings may be changed, and open the
+// section by itself on a first run.
+fetchSettings().then((view) => {
+  if (!view) return;
+  settingsAllowed = true;
+  document.getElementById("gear").hidden = false;
+  if (!view.exists || view.problem || location.hash === "#settings") openSettings();
+  render();
+}).catch(() => {});
+
+const stream = new EventSource("/events");
+stream.onopen = () => { streamUp = true; render(); };
+stream.onerror = () => { streamUp = false; render(); };
+stream.onmessage = (event) => { streamUp = true; snapshot = JSON.parse(event.data); render(); };
+</script>
+</body>
+</html>

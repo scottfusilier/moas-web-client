@@ -227,6 +227,63 @@ plat_settings_dir(char *out, size_t size)
 }
 
 int
+plat_file_writable(const char *path, bool *writable)
+{
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        return from_errno(errno);
+    }
+    /* Opening for writing (without changing anything) is the real test. */
+    int fd = open(path, O_WRONLY | O_CLOEXEC);
+    if (fd == -1) {
+        if (errno == EACCES || errno == EPERM || errno == EROFS) {
+            *writable = false;
+            return 0;
+        }
+        return from_errno(errno);
+    }
+    close(fd);
+    *writable = true;
+    return 0;
+}
+
+int
+plat_set_read_only(const char *path, bool read_only)
+{
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        return from_errno(errno);
+    }
+    mode_t mode = st.st_mode & 07777;
+    mode = read_only ? mode & ~(mode_t)0222 : mode | 0200;
+    if (chmod(path, mode) != 0) {
+        return from_errno(errno);
+    }
+    return 0;
+}
+
+int
+plat_exe_dir(const char *argv0, char *out, size_t size)
+{
+    /*
+     * A program started by a path ("./moasweb", "/usr/local/bin/moasweb")
+     * is in that path's folder.  One found on the PATH cannot be placed
+     * without system-specific calls; then there is no such folder to use.
+     */
+    const char *slash = argv0 != NULL ? strrchr(argv0, '/') : NULL;
+    if (slash == NULL) {
+        return ERR_NOT_FOUND;
+    }
+    size_t n = slash == argv0 ? 1 : (size_t)(slash - argv0);
+    if (n >= size) {
+        return ERR_LIMIT;
+    }
+    memcpy(out, argv0, n);
+    out[n] = '\0';
+    return 0;
+}
+
+int
 plat_remove_file(const char *path)
 {
     if (unlink(path) != 0) {

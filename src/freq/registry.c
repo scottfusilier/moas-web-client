@@ -105,6 +105,22 @@ freq_source_config_fini(struct freq_source_config *config)
     memset(config, 0, sizeof(*config));
 }
 
+cJSON *
+freq_source_to_json(const struct freq_source_config *config)
+{
+    cJSON *obj = cJSON_CreateObject();
+    if (obj == NULL) {
+        return NULL;
+    }
+    if (cJSON_AddStringToObject(obj, "Type", config->ops->type) == NULL ||
+        config->ops->write(config, obj) != 0)
+    {
+        cJSON_Delete(obj);
+        return NULL;
+    }
+    return obj;
+}
+
 int
 freq_env_create(struct loop *loop, struct freq_env **out)
 {

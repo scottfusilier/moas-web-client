@@ -366,10 +366,24 @@ rigctld_free_data(void *data)
     free(data);
 }
 
+static int
+rigctld_write(const struct freq_source_config *config, cJSON *obj)
+{
+    const struct rigctld_config *cfg = config->data;
+    bool ok = cJSON_AddStringToObject(obj, "Address", cfg->addr_text) !=
+                  NULL &&
+              cJSON_AddNumberToObject(obj, "TimeoutSeconds",
+                                      config->timeout_ms / 1000.0) != NULL &&
+              cJSON_AddNumberToObject(obj, "PollMilliseconds", cfg->poll_ms) !=
+                  NULL;
+    return ok ? 0 : ERR_NOMEM;
+}
+
 const struct freq_source_ops freq_rigctld_ops = {
     .type = "rigctld",
     .parse = rigctld_parse,
     .free_data = rigctld_free_data,
+    .write = rigctld_write,
     .start = rigctld_start,
     .stop = rigctld_stop,
     .env_fini = NULL,

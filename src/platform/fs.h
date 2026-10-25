@@ -14,6 +14,7 @@
 #ifndef MOAS_PLATFORM_FS_H
 #define MOAS_PLATFORM_FS_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 /*
@@ -51,6 +52,22 @@ int plat_replace_file(const char *path, const void *data, size_t len);
  * (no home folder).
  */
 int plat_settings_dir(char *out, size_t size);
+
+/*
+ * Whether this user may write the existing file at path: *writable is
+ * false for a read-only file.  ERR_NOT_FOUND if there is no such file.
+ */
+int plat_file_writable(const char *path, bool *writable);
+
+/*
+ * The folder holding the running program, found from argv0 (main()'s
+ * argv[0], after plat_process_init()).  ERR_NOT_FOUND if it cannot be
+ * told, as when the program was found on the PATH on Unix.
+ */
+int plat_exe_dir(const char *argv0, char *out, size_t size);
+
+/* Makes a file read-only, or writable again. */
+int plat_set_read_only(const char *path, bool read_only);
 
 /* Deletes a file.  ERR_NOT_FOUND if there is none. */
 int plat_remove_file(const char *path);

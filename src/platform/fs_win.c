@@ -229,6 +229,92 @@ plat_settings_dir(char *out, size_t size)
 }
 
 int
+plat_file_writable(const char *path, bool *writable)
+{
+    wchar_t *wpath;
+    int err = widen(path, NULL, &wpath);
+    if (err != 0) {
+        return err;
+    }
+    DWORD attrs = GetFileAttributesW(wpath);
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        err = from_win(GetLastError());
+    } else if ((attrs & FILE_ATTRIBUTE_READONLY) != 0) {
+        *writable = false;
+    } else {
+        /* Permissions can still forbid it: try opening for writing. */
+        HANDLE h = CreateFileW(
+            wpath, GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (h == INVALID_HANDLE_VALUE) {
+            DWORD e = GetLastError();
+            if (e == ERROR_ACCESS_DENIED) {
+                *writable = false;
+            } else {
+                err = from_win(e);
+            }
+        } else {
+            CloseHandle(h);
+            *writable = true;
+        }
+    }
+    free(wpath);
+    return err;
+}
+
+int
+plat_set_read_only(const char *path, bool read_only)
+{
+    wchar_t *wpath;
+    int err = widen(path, NULL, &wpath);
+    if (err != 0) {
+        return err;
+    }
+    DWORD attrs = GetFileAttributesW(wpath);
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        err = from_win(GetLastError());
+    } else {
+        attrs = read_only ? attrs | FILE_ATTRIBUTE_READONLY
+                          : attrs & ~(DWORD)FILE_ATTRIBUTE_READONLY;
+        if (!SetFileAttributesW(wpath, attrs)) {
+            err = from_win(GetLastError());
+        }
+    }
+    free(wpath);
+    return err;
+}
+
+int
+plat_exe_dir(const char *argv0, char *out, size_t size)
+{
+    (void)argv0;
+    /* Windows knows the program's own path, wherever it was found. */
+    wchar_t wpath[WIDE_PATH_MAX];
+    DWORD n = GetModuleFileNameW(NULL, wpath, WIDE_PATH_MAX);
+    if (n == 0 || n >= WIDE_PATH_MAX) {
+        return ERR_NOT_FOUND;
+    }
+    /* Cut the file name off. */
+    while (n > 0 && wpath[n - 1] != L'\\' && wpath[n - 1] != L'/') {
+        n--;
+    }
+    if (n == 0) {
+        return ERR_NOT_FOUND;
+    }
+    wpath[n - 1] = L'\0';
+    int len = WideCharToMultiByte(CP_UTF8, 0, wpath, -1, NULL, 0, NULL, NULL);
+    if (len <= 0) {
+        return ERR_INVALID;
+    }
+    if ((size_t)len > size) {
+        return ERR_LIMIT;
+    }
+    WideCharToMultiByte(CP_UTF8, 0, wpath, -1, out, len, NULL, NULL);
+    return 0;
+}
+
+int
 plat_remove_file(const char *path)
 {
     wchar_t *wpath;

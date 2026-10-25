@@ -386,10 +386,29 @@ n1mm_free_data(void *data)
     free(data);
 }
 
+/* As the Go version saves it: StationName and TimeoutSeconds only if set. */
+static int
+n1mm_write(const struct freq_source_config *config, cJSON *obj)
+{
+    const struct n1mm_config *cfg = config->data;
+    bool ok = cJSON_AddStringToObject(obj, "Address", cfg->addr_text) !=
+                  NULL &&
+              cJSON_AddNumberToObject(obj, "RadioNr", cfg->radio_nr) != NULL;
+    if (ok && cfg->station[0] != '\0') {
+        ok = cJSON_AddStringToObject(obj, "StationName", cfg->station) != NULL;
+    }
+    if (ok && config->timeout_ms != 0) {
+        ok = cJSON_AddNumberToObject(obj, "TimeoutSeconds",
+                                     config->timeout_ms / 1000.0) != NULL;
+    }
+    return ok ? 0 : ERR_NOMEM;
+}
+
 const struct freq_source_ops freq_n1mm_ops = {
     .type = "n1mm",
     .parse = n1mm_parse,
     .free_data = n1mm_free_data,
+    .write = n1mm_write,
     .start = n1mm_start,
     .stop = n1mm_stop,
     .env_fini = n1mm_env_fini,

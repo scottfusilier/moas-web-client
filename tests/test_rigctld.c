@@ -15,6 +15,7 @@
 #include "freq/rigctld.h"
 #include "freq/rigctld_reply.h"
 #include "freq/source.h"
+#include "fake_rig.h"
 #include "platform/clock.h"
 #include "test.h"
 
@@ -45,86 +46,6 @@ test_replies(void)
         test_check(err == ERR_INVALID || err == ERR_RANGE, bad[i], __FILE__,
                    __LINE__);
     }
-}
-
-/* A rigctld stand-in on the same loop: answers "f" with reply. */
-struct fake_rig {
-    struct loop *loop;
-    struct plat_addr addr;
-    plat_socket listener;
-    plat_socket client;
-    char reply[64];
-    bool silent; /* never answer */
-    int accepted;
-};
-
-static void
-fake_on_client(struct loop *loop, plat_socket sock, int events, void *arg)
-{
-    (void)events;
-    struct fake_rig *f = arg;
-    char buf[256];
-    size_t got = 0;
-    int err = plat_recv(sock, buf, sizeof(buf), &got);
-    if (err == ERR_AGAIN) {
-        return;
-    }
-    if (err != 0) {
-        loop_unwatch(loop, sock);
-        plat_socket_close(sock);
-        f->client = PLAT_INVALID_SOCKET;
-        return;
-    }
-    for (size_t i = 0; i < got; i++) {
-        if (buf[i] == '\n' && !f->silent) {
-            char line[80];
-            snprintf(line, sizeof(line), "%s\n", f->reply);
-            size_t sent;
-            plat_send(sock, line, strlen(line), &sent);
-        }
-    }
-}
-
-static void
-fake_on_listener(struct loop *loop, plat_socket sock, int events, void *arg)
-{
-    (void)events;
-    struct fake_rig *f = arg;
-    plat_socket c;
-    if (plat_tcp_accept(sock, &c, NULL) != 0) {
-        return;
-    }
-    if (f->client != PLAT_INVALID_SOCKET) {
-        loop_unwatch(loop, f->client);
-        plat_socket_close(f->client);
-    }
-    f->client = c;
-    f->accepted++;
-    loop_watch(loop, c, LOOP_READ, fake_on_client, f);
-}
-
-static void
-fake_start(struct fake_rig *f, struct loop *loop, const char *reply)
-{
-    memset(f, 0, sizeof(*f));
-    f->loop = loop;
-    f->client = PLAT_INVALID_SOCKET;
-    snprintf(f->reply, sizeof(f->reply), "%s", reply);
-    plat_addr_parse("127.0.0.1:0", 11, &f->addr);
-    plat_tcp_listen(&f->addr, &f->listener);
-    plat_socket_local_addr(f->listener, &f->addr);
-    loop_watch(loop, f->listener, LOOP_READ, fake_on_listener, f);
-}
-
-static void
-fake_stop(struct fake_rig *f)
-{
-    if (f->client != PLAT_INVALID_SOCKET) {
-        loop_unwatch(f->loop, f->client);
-        plat_socket_close(f->client);
-    }
-    loop_unwatch(f->loop, f->listener);
-    plat_socket_close(f->listener);
 }
 
 static int
@@ -192,7 +113,7 @@ test_source(void)
     CHECK_INT_EQ(loop_create(&loop), 0);
     CHECK_INT_EQ(freq_env_create(loop, &env), 0);
     CHECK_INT_EQ(freq_tracker_create(loop, NULL, NULL, &t), 0);
-    fake_start(&rig, loop, "14025000");
+    fake_rig_start(&rig, loop, "14025000");
     CHECK_INT_EQ(
         start_source(env, &rig.addr, ",\"PollMilliseconds\":50", t, &s), 0);
 
@@ -216,7 +137,7 @@ test_source(void)
     CHECK(run_until_state(loop, t, 0, true, "no reply", 8000));
 
     freq_source_stop(s);
-    fake_stop(&rig);
+    fake_rig_stop(&rig);
     freq_tracker_destroy(t);
     freq_env_destroy(env);
     loop_destroy(loop);
@@ -276,7 +197,7 @@ test_one_off(void)
     struct test_result r = {0};
 
     CHECK_INT_EQ(loop_create(&loop), 0);
-    fake_start(&rig, loop, "28074000");
+    fake_rig_start(&rig, loop, "28074000");
     CHECK_INT_EQ(freq_rigctld_test(loop, &rig.addr, on_test_done, &r, &test),
                  0);
     for (int i = 0; i < 150 && !r.done; i++) {
@@ -307,7 +228,7 @@ test_one_off(void)
     }
     CHECK(!r3.done);
 
-    fake_stop(&rig);
+    fake_rig_stop(&rig);
     loop_destroy(loop);
 }
 

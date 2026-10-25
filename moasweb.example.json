@@ -1,0 +1,30 @@
+{
+    "_comment" : "Example moasweb settings.  Every entry is optional; missing ones take",
+    "_comment" : "the defaults shown here.  _comment entries are ignored, but saving",
+    "_comment" : "from the page's Settings section does not keep them.",
+
+    "Version" : 1,
+    "Server" : "127.0.0.1:12059",
+    "Listen" : "127.0.0.1:8080",
+    "Station" : 1,
+    "Rows" : 6,
+    "Columns" : 5,
+
+    "Radios" : [
+        {
+            "_comment" : "Sources are tried in order; the first one working wins.",
+            "Radio" : 1,
+            "Sources" : [
+                { "Type" : "n1mm", "Address" : "127.0.0.1:12060", "RadioNr" : 1 },
+                { "Type" : "rigctld", "Address" : "127.0.0.1:4532" }
+            ]
+        },
+        {
+            "Radio" : 2,
+            "Sources" : [
+                { "Type" : "n1mm", "Address" : "127.0.0.1:12060", "RadioNr" : 2 },
+                { "Type" : "rigctld", "Address" : "127.0.0.1:4533" }
+            ]
+        }
+    ]
+}

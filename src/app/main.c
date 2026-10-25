@@ -4,10 +4,15 @@
  */
 
 /*
- * moasweb: a client for the MOAS II antenna switch server.
+ * moasweb: a client for the MOAS II antenna switch server, with its buttons
+ * in a web page.  It connects to a MOAS server for one or more radios and
+ * serves a page that shows the server's button grid and sends clicks back.
  *
- * So far only watch mode (-watch) exists; the web interface comes in later
- * stages (see docs/ROADMAP.md).
+ * Each radio's frequency can come from N1MM Logger+ or hamlib's rigctld, as
+ * set in the settings file, or be typed on the page.
+ *
+ * By default the page is served to this computer only.  The MOAS protocol
+ * has no login, so anyone who can open the page can switch antennas.
  */
 
 #include "core/common.h"
@@ -15,7 +20,10 @@
 #include <stdio.h>
 
 #include "app/args.h"
+#include "app/serve.h"
+#include "app/settings_file.h"
 #include "app/watch.h"
+#include "core/caps.h"
 #include "platform/proc.h"
 
 int
@@ -41,11 +49,25 @@ main(int argc, char **argv)
         printf("moasweb %s\n", MOAS_VERSION);
         return 0;
     }
-    if (args.watch) {
-        return app_watch_run(&args);
+    if (!args.watch) {
+        return app_serve(&args, argv[0]);
     }
-    printf("moasweb %s: the web interface is not built yet.  Run moasweb "
-           "-watch to watch a MOAS server, or -help for the options.\n",
-           MOAS_VERSION);
-    return 0;
+
+    /* Watch mode: the server and station from the settings file, unless
+     * given. */
+    char path[CAPS_PATH];
+    struct app_settings s;
+    char message[320];
+    app_settings_defaults(&s);
+    if (app_settings_find(args.config, argv[0], path, sizeof(path)) == 0 &&
+        app_startup_settings(path, &args, true, &s, message,
+                             sizeof(message)) == 0)
+    {
+        static char server[PLAT_ADDR_TEXT_MAX];
+        snprintf(server, sizeof(server), "%s", s.server);
+        args.server = server;
+        args.station = s.station;
+    }
+    app_settings_fini(&s);
+    return app_watch_run(&args);
 }

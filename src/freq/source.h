@@ -76,6 +76,13 @@ struct freq_source_ops {
     /* Frees config->data. */
     void (*free_data)(void *data);
 
+    /*
+     * Writes the settings back into obj (which already holds "Type"), with
+     * defaults filled in, as they are saved to the settings file and shown
+     * on the page.  Settings left at their "unset" value may be left out.
+     */
+    int (*write)(const struct freq_source_config *config, cJSON *obj);
+
     /* Starts the source; it reports through feed until stopped. */
     int (*start)(struct freq_env *env, const struct freq_source_config *config,
                  struct freq_feed feed, struct freq_source **out);
@@ -103,6 +110,12 @@ int freq_parse_source(const cJSON *json, int moas_radio,
                       struct freq_field_error *err);
 
 void freq_source_config_fini(struct freq_source_config *config);
+
+/*
+ * The source's settings as a JSON object ({"Type": ..., ...}), for the
+ * settings file and the page.  NULL if out of memory.
+ */
+cJSON *freq_source_to_json(const struct freq_source_config *config);
 
 int freq_env_create(struct loop *loop, struct freq_env **out);
 void freq_env_destroy(struct freq_env *env);

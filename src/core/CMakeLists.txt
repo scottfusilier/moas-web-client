@@ -8,6 +8,7 @@ add_library(moas_core STATIC
     buf.c
     json.c
     log.c
+    sha256.c
     loop.c
     str.c)
 moas_warnings(moas_core)

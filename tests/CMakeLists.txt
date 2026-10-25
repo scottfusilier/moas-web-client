@@ -26,6 +26,7 @@ moas_test(str LIBS moas_core)
 moas_test(buf LIBS moas_core)
 moas_test(json LIBS moas_core)
 moas_test(log LIBS moas_core)
+moas_test(sha256 LIBS moas_core)
 moas_test(loop LIBS moas_core)
 
 # The MOAS protocol.
@@ -36,7 +37,7 @@ moas_test(client LIBS moas_oasp SOURCES fake_moas_server.c)
 # Frequency sources.
 moas_test(tracker LIBS moas_freq)
 moas_test(n1mm LIBS moas_freq)
-moas_test(rigctld LIBS moas_freq)
+moas_test(rigctld LIBS moas_freq SOURCES fake_rig.c)
 
 # The HTTP server.
 moas_test(http_parse LIBS moas_http)
@@ -44,7 +45,12 @@ moas_test(http_server LIBS moas_http)
 
 # moasweb.
 moas_test(args LIBS moas_app)
+moas_test(settings LIBS moas_app)
+target_compile_definitions(test_settings PRIVATE
+    EXAMPLE_SETTINGS="${PROJECT_SOURCE_DIR}/moasweb.example.json")
 moas_test(watch LIBS moas_app SOURCES fake_moas_server.c)
+moas_test(web LIBS moas_app
+    SOURCES fake_moas_server.c fake_rig.c http_client.c)
 
 add_test(NAME banned_functions
     COMMAND "${CMAKE_COMMAND}" -DSOURCE_DIR=${PROJECT_SOURCE_DIR}

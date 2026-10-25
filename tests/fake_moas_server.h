@@ -13,6 +13,7 @@
 #ifndef MOAS_TESTS_FAKE_MOAS_SERVER_H
 #define MOAS_TESTS_FAKE_MOAS_SERVER_H
 
+#include "cJSON.h"
 #include "core/common.h"
 #include "core/loop.h"
 #include "core/str.h"
@@ -22,11 +23,19 @@ struct fake_server;
 
 typedef void fake_connect_fn(struct fake_server *server, void *arg);
 
+/* Called for each complete message a client sends (as parsed JSON). */
+typedef void fake_message_fn(struct fake_server *server, const cJSON *msg,
+                             void *arg);
+
 int fake_server_create(struct loop *loop, struct fake_server **out);
 void fake_server_destroy(struct fake_server *server);
 
 /* Called each time a client connects. */
 void fake_server_on_connect(struct fake_server *server, fake_connect_fn *fn,
+                            void *arg);
+
+/* Called for each complete message received. */
+void fake_server_on_message(struct fake_server *server, fake_message_fn *fn,
                             void *arg);
 
 /* Where to connect to it. */

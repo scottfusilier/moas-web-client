@@ -18,45 +18,78 @@ enum kind {
 };
 
 struct option {
+    enum app_option id;
     const char *name;
     enum kind kind;
     int min;
     int max;
 };
 
-/*
- * The options, in the order -help lists them.  Keep app_args_usage() in
- * step with this table.
- */
+/* Keep app_args_usage() in step with this table. */
 static const struct option options[] = {
-    {"help", FLAG, 0, 0},        {"version", FLAG, 0, 0},
-    {"watch", FLAG, 0, 0},       {"server", TEXT, 0, 0},
-    {"station", NUMBER, 1, 255}, {"radio", NUMBER, 1, 255},
-    {"rows", NUMBER, 1, 64},     {"columns", NUMBER, 1, 64},
-    {"config", TEXT, 0, 0},
+    {APP_OPT_HELP, "help", FLAG, 0, 0},
+    {APP_OPT_VERSION, "version", FLAG, 0, 0},
+    {APP_OPT_WATCH, "watch", FLAG, 0, 0},
+    {APP_OPT_CONFIG, "config", TEXT, 0, 0},
+    {APP_OPT_SERVER, "server", TEXT, 0, 0},
+    {APP_OPT_LISTEN, "listen", TEXT, 0, 0},
+    {APP_OPT_STATION, "station", NUMBER, 1, 255},
+    {APP_OPT_RADIOS, "radios", TEXT, 0, 0},
+    {APP_OPT_RADIO, "radio", NUMBER, 1, 255},
+    {APP_OPT_ROWS, "rows", NUMBER, 1, 64},
+    {APP_OPT_COLUMNS, "columns", NUMBER, 1, 64},
 };
+
+_Static_assert(ARRAY_LEN(options) == APP_OPT_COUNT,
+               "every option needs a row in options[]");
 
 const char *
 app_args_usage(void)
 {
     return "Usage: moasweb [options]\n"
            "\n"
-           "  -watch            connect to the MOAS server and print what it\n"
-           "                    sends, changing nothing (for "
-           "troubleshooting)\n"
+           "Serves a page with the MOAS server's antenna buttons; open the "
+           "address it\n"
+           "prints in a browser.  Options given here win over the settings "
+           "file.\n"
+           "\n"
+           "  -config FILE      the settings file; without it, moasweb.json "
+           "beside the\n"
+           "                    program if there is one, else in your "
+           "settings folder\n"
            "  -server ADDRESS   the MOAS server, for example "
            "192.168.1.10:12059\n"
-           "                    (default 127.0.0.1:12059)\n"
+           "  -listen ADDRESS   where to serve the page (default "
+           "127.0.0.1:8080, which\n"
+           "                    reaches this computer only)\n"
            "  -station N        the station number (default 1)\n"
-           "  -radio N          the radio number to watch (default 1)\n"
+           "  -radios LIST      the radios to show, such as 1,2; not with a "
+           "settings file\n"
+           "                    that lists radios\n"
            "  -rows N           grid rows to ask the server for (default 6)\n"
            "  -columns N        grid columns to ask the server for (default "
            "5)\n"
-           "  -config FILE      the settings file (not used yet)\n"
+           "\n"
+           "  -watch            instead, print what the MOAS server sends for "
+           "one radio,\n"
+           "                    changing nothing (for troubleshooting)\n"
+           "  -radio N          the radio to watch (default 1)\n"
+           "\n"
            "  -version          print the version\n"
            "  -help             print this help\n"
            "\n"
            "Options may also be written --name, or -name=value.\n";
+}
+
+const char *
+app_args_name(enum app_option option)
+{
+    for (size_t i = 0; i < ARRAY_LEN(options); i++) {
+        if (options[i].id == option) {
+            return options[i].name;
+        }
+    }
+    return "";
 }
 
 static const struct option *
@@ -75,8 +108,6 @@ static int
 store(struct app_args *out, const struct option *o, const char *value,
       char *error, size_t error_size)
 {
-    const char *n = o->name;
-
     if (o->kind == FLAG) {
         bool on;
         if (value == NULL || strcmp(value, "true") == 0) {
@@ -85,12 +116,12 @@ store(struct app_args *out, const struct option *o, const char *value,
             on = false;
         } else {
             snprintf(error, error_size, "-%s takes true or false, not \"%s\"",
-                     n, value);
+                     o->name, value);
             return ERR_INVALID;
         }
-        if (strcmp(n, "help") == 0) {
+        if (o->id == APP_OPT_HELP) {
             out->help = on;
-        } else if (strcmp(n, "version") == 0) {
+        } else if (o->id == APP_OPT_VERSION) {
             out->version = on;
         } else {
             out->watch = on;
@@ -99,10 +130,19 @@ store(struct app_args *out, const struct option *o, const char *value,
     }
 
     if (o->kind == TEXT) {
-        if (strcmp(n, "server") == 0) {
-            out->server = value;
-        } else {
+        switch (o->id) {
+        case APP_OPT_CONFIG:
             out->config = value;
+            break;
+        case APP_OPT_SERVER:
+            out->server = value;
+            break;
+        case APP_OPT_LISTEN:
+            out->listen = value;
+            break;
+        default:
+            out->radios = value;
+            break;
         }
         return 0;
     }
@@ -111,19 +151,23 @@ store(struct app_args *out, const struct option *o, const char *value,
     int err = str_to_i64(str_from_cstr(value), o->min, o->max, &v);
     if (err != 0) {
         snprintf(error, error_size,
-                 "-%s needs a whole number from %d to %d, "
-                 "not \"%s\"",
-                 n, o->min, o->max, value);
+                 "-%s needs a whole number from %d to %d, not \"%s\"", o->name,
+                 o->min, o->max, value);
         return ERR_INVALID;
     }
-    if (strcmp(n, "station") == 0) {
+    switch (o->id) {
+    case APP_OPT_STATION:
         out->station = (int)v;
-    } else if (strcmp(n, "radio") == 0) {
+        break;
+    case APP_OPT_RADIO:
         out->radio = (int)v;
-    } else if (strcmp(n, "rows") == 0) {
+        break;
+    case APP_OPT_ROWS:
         out->rows = (int)v;
-    } else {
+        break;
+    default:
         out->columns = (int)v;
+        break;
     }
     return 0;
 }
@@ -134,7 +178,9 @@ app_args_parse(int argc, char **argv, struct app_args *out, char *error,
 {
     memset(out, 0, sizeof(*out));
     out->server = "127.0.0.1:12059";
+    out->listen = "127.0.0.1:8080";
     out->station = 1;
+    out->radios = "1,2";
     out->radio = 1;
     out->rows = 6;
     out->columns = 5;
@@ -169,6 +215,7 @@ app_args_parse(int argc, char **argv, struct app_args *out, char *error,
         if (err != 0) {
             return err;
         }
+        out->given[o->id] = true;
     }
     return 0;
 }
