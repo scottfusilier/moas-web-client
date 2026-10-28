@@ -24,6 +24,7 @@
 #include "core/json.h"
 #include "core/sha256.h"
 #include "fake_moas_server.h"
+#include "fake_n3fjp.h"
 #include "fake_rig.h"
 #include "http_client.h"
 #include "platform/clock.h"
@@ -1084,6 +1085,105 @@ test_rigctld_route(void)
     stop();
 }
 
+/* An N3FJP program as a radio's only source, to the server and back. */
+static void
+test_n3fjp_source(void)
+{
+    struct fake_n3fjp f;
+    char addr[PLAT_ADDR_TEXT_MAX];
+    char radio[256];
+
+    if (!start_loop()) {
+        return;
+    }
+    fake_n3fjp_start(&f, fx.loop, "3.537000");
+    plat_addr_format(&f.addr, addr);
+    snprintf(
+        radio, sizeof(radio),
+        "{\"Radio\":1,\"Sources\":[{\"Type\":\"n3fjp\",\"Address\":\"%s\","
+        "\"PollMilliseconds\":1000}]}",
+        addr);
+    if (!start_app(radio)) {
+        fake_n3fjp_stop(&f);
+        stop();
+        return;
+    }
+    connect_up();
+
+    EXPECT_RADIO(3537);
+    /* A change N3FJP sends by itself, and one read by polling. */
+    fake_n3fjp_send(&f, "<CMD><READBMFRESPONSE><BAND>20</BAND><MODE>CW</MODE>"
+                        "<MODETEST>CW</MODETEST><FREQ>14.025000</FREQ></CMD>"
+                        "\r\n");
+    fake_n3fjp_set_freq(&f, "14.025000");
+    EXPECT_RADIO(14025);
+    fake_n3fjp_set_freq(&f, "7.003000");
+    EXPECT_RADIO(7003);
+
+    cJSON *snap = snapshot();
+    const cJSON *r = radio_of(snap);
+    char origin[PLAT_ADDR_TEXT_MAX + 8];
+    snprintf(origin, sizeof(origin), "N3FJP %s", addr);
+    CHECK_MEM_EQ(text(r, "origin"), strlen(text(r, "origin")), origin);
+    cJSON_Delete(snap);
+
+    /* N3FJP exits: the source shows why, and the radio keeps its frequency. */
+    fake_n3fjp_stop(&f);
+    wait_ms(300);
+    snap = snapshot();
+    r = radio_of(snap);
+    const cJSON *source = cJSON_GetArrayItem(
+        cJSON_GetObjectItemCaseSensitive(r, "sources"), 0);
+    CHECK_MEM_EQ(text(source, "state"), strlen(text(source, "state")),
+                 "error");
+    CHECK(strstr(text(source, "error"), "N3FJP at ") != NULL);
+    cJSON_Delete(snap);
+    EXPECT_NOTHING(300);
+
+    stop();
+}
+
+static void
+test_n3fjp_route(void)
+{
+    struct fake_n3fjp f;
+    char body[160];
+    char addr[PLAT_ADDR_TEXT_MAX];
+    cJSON *answer = NULL;
+
+    if (!start_loop()) {
+        return;
+    }
+    fake_n3fjp_start(&f, fx.loop, "21.074000");
+    if (!start_app(NULL)) {
+        fake_n3fjp_stop(&f);
+        stop();
+        return;
+    }
+    plat_addr_format(&f.addr, addr);
+    snprintf(body, sizeof(body), "{\"address\":\" %s \"}", addr);
+    CHECK_INT_EQ(request_json("POST", "/api/n3fjp-test", body, &answer), 200);
+    CHECK_INT_EQ(number(answer, "kHz"), 21074);
+    cJSON_Delete(answer);
+
+    CHECK_INT_EQ(request_json("POST", "/api/n3fjp-test",
+                              "{\"address\":\"1100\"}", &answer),
+                 400);
+    CHECK_MEM_EQ(text(answer, "Field"), strlen(text(answer, "Field")),
+                 "Address");
+    CHECK(strstr(text(answer, "Message"), "127.0.0.1:1100") != NULL);
+    cJSON_Delete(answer);
+
+    /* N3FJP showing no frequency. */
+    fake_n3fjp_set_freq(&f, "");
+    CHECK_INT_EQ(request_json("POST", "/api/n3fjp-test", body, &answer), 502);
+    CHECK(strstr(text(answer, "Message"), "no usable frequency") != NULL);
+    cJSON_Delete(answer);
+
+    fake_n3fjp_stop(&f);
+    stop();
+}
+
 /*
  * The next Antenna message: its one or two choices, as "TX:3/60" or
  * "TX:6/0,RX:6/0" (change/antenna), written to out.
@@ -1505,6 +1605,8 @@ main(void)
     RUN(test_follower);
     RUN(test_settings_routes);
     RUN(test_rigctld_route);
+    RUN(test_n3fjp_source);
+    RUN(test_n3fjp_route);
     RUN(test_every_kind_of_button);
     RUN(test_server_notices);
     RUN(test_logger_antenna_and_caption);

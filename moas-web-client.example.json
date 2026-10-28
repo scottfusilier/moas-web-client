@@ -17,7 +17,8 @@
             "Radio" : 1,
             "Sources" : [
                 { "Type" : "n1mm", "Address" : "127.0.0.1:12060", "RadioNr" : 1 },
-                { "Type" : "rigctld", "Address" : "127.0.0.1:4532" }
+                { "Type" : "rigctld", "Address" : "127.0.0.1:4532" },
+                { "Type" : "n3fjp", "Address" : "127.0.0.1:1100" }
             ]
         },
         {

@@ -7,6 +7,8 @@
 add_library(moas_freq STATIC
     n1mm.c
     n1mm_xml.c
+    n3fjp.c
+    n3fjp_reply.c
     registry.c
     rigctld.c
     rigctld_reply.c

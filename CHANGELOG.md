@@ -80,6 +80,11 @@ numbers follow [Semantic Versioning](https://semver.org/).
   TX/RX NOT REPORTED until a radio reports receive or transmit, rather
   than as every radio inhibited, with advice to set `IndicateTR` on the
   switch.  `ShowTXRX` (on unless turned off) stops asking for it.
+* The `n3fjp` frequency source, for Amateur Contact Log and the other N3FJP
+  programs, through their TCP API.  It takes the frequency changes N3FJP
+  sends by itself, polls every 2 seconds by default to check that N3FJP
+  still answers, and uses only the frequency.  The settings page offers
+  it, with a Test button.
 
 ### Fixed
 

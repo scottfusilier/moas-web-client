@@ -1,11 +1,13 @@
 # Adding a frequency source
 
 A frequency source is a program that can tell moas-web-client a radio's
-frequency: N1MM Logger+, DXLog.net and hamlib's rigctld so far.  Each kind
-of source is a *type*.  Adding one means writing one file and adding one
-line to `src/freq/registry.c`; the tracker, the settings code and the rest
-of moas-web-client do not change.  This guide uses the rigctld type
-(`src/freq/rigctld.c`) as the example.
+frequency: N1MM Logger+, DXLog.net, hamlib's rigctld and the N3FJP
+programs so far.  Each kind of source is a *type*.  Adding one means
+writing one file and adding one line to `src/freq/registry.c`; the
+tracker, the settings code and the rest of moas-web-client do not change.
+This guide uses the rigctld type (`src/freq/rigctld.c`) as the example.
+The n3fjp type (`src/freq/n3fjp.c`) has the same shape, for a program
+that also sends readings without being asked.
 
 ## How sources fit in
 

@@ -18,6 +18,7 @@
 #include "core/json.h"
 #include "core/str.h"
 #include "freq/n1mm.h"
+#include "freq/n3fjp.h"
 #include "freq/rigctld.h"
 #include "freq/source.h"
 
@@ -25,6 +26,7 @@ static const struct freq_source_ops *const types[] = {
     &freq_n1mm_ops,
     &freq_dxlog_ops,
     &freq_rigctld_ops,
+    &freq_n3fjp_ops,
 };
 
 struct freq_env {
@@ -60,7 +62,7 @@ freq_find_type(const char *name)
 const char *
 freq_type_list(void)
 {
-    return "\"n1mm\", \"dxlog\" or \"rigctld\"";
+    return "\"n1mm\", \"dxlog\", \"rigctld\" or \"n3fjp\"";
 }
 
 int

@@ -38,6 +38,7 @@ moas_test(client LIBS moas_oasp SOURCES fake_moas_server.c)
 moas_test(tracker LIBS moas_freq)
 moas_test(n1mm LIBS moas_freq)
 moas_test(rigctld LIBS moas_freq SOURCES fake_rig.c)
+moas_test(n3fjp LIBS moas_freq SOURCES fake_n3fjp.c)
 
 # The HTTP server.
 moas_test(http_parse LIBS moas_http)
@@ -50,7 +51,7 @@ target_compile_definitions(test_settings PRIVATE
     EXAMPLE_SETTINGS="${PROJECT_SOURCE_DIR}/moas-web-client.example.json")
 moas_test(watch LIBS moas_app SOURCES fake_moas_server.c)
 moas_test(web LIBS moas_app
-    SOURCES fake_moas_server.c fake_rig.c http_client.c)
+    SOURCES fake_moas_server.c fake_n3fjp.c fake_rig.c http_client.c)
 
 add_test(NAME banned_functions
     COMMAND "${CMAKE_COMMAND}" -DSOURCE_DIR=${PROJECT_SOURCE_DIR}

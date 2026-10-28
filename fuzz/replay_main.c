@@ -19,7 +19,7 @@
 #include "platform/fs.h"
 #include "platform/proc.h"
 
-#define MAX_INPUT (4 * 1024 * 1024)
+#define REPLAY_MAX_INPUT (4 * 1024 * 1024)
 
 int
 main(int argc, char **argv)
@@ -31,7 +31,7 @@ main(int argc, char **argv)
     for (int i = 1; i < argc; i++) {
         char *data = NULL;
         size_t len = 0;
-        int err = plat_read_file(argv[i], MAX_INPUT, &data, &len);
+        int err = plat_read_file(argv[i], REPLAY_MAX_INPUT, &data, &len);
         if (err != 0) {
             fprintf(stderr, "%s: cannot read: %s\n", argv[i], err_str(err));
             failed = 1;

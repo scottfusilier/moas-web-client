@@ -1,0 +1,1 @@
+{"Radios": [{"Radio": 1, "Sources": [{"Type": "n3fjp", "Address": "127.0.0.1:1100", "PollMilliseconds": 2000, "TimeoutSeconds": 5}, {"Type": "N3FJP", "PollMilliseconds": 10000}]}]}

@@ -16,6 +16,7 @@
 #include "core/json.h"
 #include "core/log.h"
 #include "core/sha256.h"
+#include "freq/n3fjp.h"
 #include "freq/rigctld.h"
 
 /* The largest snapshot sent (a station with many radios and buttons). */
@@ -520,10 +521,14 @@ on_heard(struct http_reply *reply, const struct http_request *req, void *arg)
     reply_json(reply, 200, app_runner_heard(w->runner));
 }
 
-/* A rigctld test in progress, tied to the reply that waits for it. */
+/*
+ * A rigctld or N3FJP test in progress, tied to the reply that waits for it;
+ * one of the two handles is set.
+ */
 struct pending_test {
     struct http_reply *reply;
-    struct freq_rigctld_test *test;
+    struct freq_rigctld_test *rigctld;
+    struct freq_n3fjp_test *n3fjp;
 };
 
 static void
@@ -548,46 +553,86 @@ static void
 on_test_abandoned(void *arg)
 {
     struct pending_test *p = arg;
-    freq_rigctld_test_cancel(p->test);
+    freq_rigctld_test_cancel(p->rigctld);
+    freq_n3fjp_test_cancel(p->n3fjp);
     free(p);
+}
+
+/*
+ * Reads a Test request, {address}, and makes its pending_test; NULL after
+ * replying with the problem.  example is a valid address for the message.
+ */
+static struct pending_test *
+start_test(struct http_reply *reply, const struct http_request *req,
+           const char *example, struct plat_addr *addr)
+{
+    static const char *const allowed[] = {"address", NULL};
+    cJSON *json = read_body(reply, req, allowed);
+    if (json == NULL) {
+        return NULL;
+    }
+    char text[PLAT_ADDR_TEXT_MAX] = "";
+    json_get_text(json, "address", text, sizeof(text));
+    cJSON_Delete(json);
+    struct str a = str_trim(str_from_cstr(text));
+    if (plat_addr_parse(a.ptr, a.len, addr) != 0) {
+        char message[160];
+        snprintf(message, sizeof(message),
+                 "Address \"%.*s\" is not host:port with a numeric host, "
+                 "for example %s",
+                 (int)a.len, a.ptr, example);
+        reply_field_error(reply, 400, "Address", message);
+        return NULL;
+    }
+    struct pending_test *p = calloc(1, sizeof(*p));
+    if (p == NULL) {
+        http_reply_error(reply, 500, "out of memory");
+        return NULL;
+    }
+    p->reply = reply;
+    return p;
+}
+
+/* Waits for the test that has just started, or replies that it did not. */
+static void
+wait_for_test(struct http_reply *reply, struct pending_test *p, int err)
+{
+    if (err != 0) {
+        free(p);
+        http_reply_error(reply, 500, "cannot start the test");
+        return;
+    }
+    http_reply_on_cancel(reply, on_test_abandoned, p);
 }
 
 static void
 on_rigctld_test(struct http_reply *reply, const struct http_request *req,
                 void *arg)
 {
-    static const char *const allowed[] = {"address", NULL};
     struct app_web *w = arg;
-    cJSON *json = read_body(reply, req, allowed);
-    if (json == NULL) {
-        return;
-    }
-    char text[PLAT_ADDR_TEXT_MAX] = "";
-    json_get_text(json, "address", text, sizeof(text));
-    cJSON_Delete(json);
-    struct str a = str_trim(str_from_cstr(text));
     struct plat_addr addr;
-    if (plat_addr_parse(a.ptr, a.len, &addr) != 0) {
-        char message[160];
-        snprintf(message, sizeof(message),
-                 "Address \"%.*s\" is not host:port with a numeric host, "
-                 "for example 127.0.0.1:4532",
-                 (int)a.len, a.ptr);
-        reply_field_error(reply, 400, "Address", message);
-        return;
+    struct pending_test *p = start_test(reply, req,
+                                        FREQ_RIGCTLD_DEFAULT_ADDRESS, &addr);
+    if (p != NULL) {
+        wait_for_test(
+            reply, p,
+            freq_rigctld_test(w->loop, &addr, on_test_done, p, &p->rigctld));
     }
-    struct pending_test *p = calloc(1, sizeof(*p));
-    if (p == NULL) {
-        http_reply_error(reply, 500, "out of memory");
-        return;
+}
+
+static void
+on_n3fjp_test(struct http_reply *reply, const struct http_request *req,
+              void *arg)
+{
+    struct app_web *w = arg;
+    struct plat_addr addr;
+    struct pending_test *p = start_test(reply, req, FREQ_N3FJP_DEFAULT_ADDRESS,
+                                        &addr);
+    if (p != NULL) {
+        wait_for_test(
+            reply, p,
+            freq_n3fjp_test(w->loop, &addr, on_test_done, p, &p->n3fjp));
     }
-    p->reply = reply;
-    if (freq_rigctld_test(w->loop, &addr, on_test_done, p, &p->test) != 0) {
-        free(p);
-        http_reply_error(reply, 500, "cannot start the test");
-        return;
-    }
-    http_reply_on_cancel(reply, on_test_abandoned, p);
 }
 
 /*
@@ -668,6 +713,7 @@ app_web_create(struct loop *loop, struct app_runner *runner,
         {"POST", "/api/settings", &local_settings, on_put_settings},
         {"GET", "/api/n1mm-heard", &local, on_heard},
         {"POST", "/api/rigctld-test", &local, on_rigctld_test},
+        {"POST", "/api/n3fjp-test", &local, on_n3fjp_test},
     };
     for (size_t i = 0; err == 0 && i < ARRAY_LEN(routes); i++) {
         err = http_router_add(w->router, routes[i].method, routes[i].path,

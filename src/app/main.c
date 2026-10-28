@@ -8,8 +8,9 @@
  * buttons in a web page.  It connects to a MOAS server for one or more radios
  * and serves a page that shows the server's button grid and sends clicks back.
  *
- * Each radio's frequency can come from N1MM Logger+, DXLog.net or hamlib's
- * rigctld, as set in the settings file, or be typed on the page.
+ * Each radio's frequency can come from N1MM Logger+, DXLog.net, hamlib's
+ * rigctld or an N3FJP program, as set in the settings file, or be typed on
+ * the page.
  *
  * By default the page is served to this computer only.  The MOAS protocol
  * has no login, so anyone who can open the page can switch antennas.

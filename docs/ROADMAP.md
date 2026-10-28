@@ -108,7 +108,8 @@ moas-web-client/
 │   │   ├── registry.c             type name to operations
 │   │   ├── tracker.h, tracker.c   priority, failover, manual override, status
 │   │   ├── n1mm.c, n1mm_xml.c     UDP listener; RadioInfo reader (fuzzed)
-│   │   └── rigctld.c, rigctld_reply.c   poller and Test; reply parser (fuzzed)
+│   │   ├── rigctld.c, rigctld_reply.c   poller and Test; reply parser (fuzzed)
+│   │   └── n3fjp.c, n3fjp_reply.c       poller and Test; line reader (fuzzed)
 │   ├── http/                      prefix http_
 │   │   ├── http.h                 the interface: routes, replies, streams, server
 │   │   ├── parse.h, parse.c       request heads: picohttpparser plus our checks (fuzzed)
@@ -132,12 +133,13 @@ moas-web-client/
 │   ├── fake_moas_server.c/.h      scripted MOAS server on loopback, same event loop
 │   ├── oasp_samples.h             sample server messages shared by tests and corpus
 │   ├── fake_rig.c/.h              rigctld stand-in on loopback, same event loop
+│   ├── fake_n3fjp.c/.h            N3FJP API stand-in on loopback, same event loop
 │   ├── http_client.c/.h           a small HTTP client on the same event loop
 │   └── test_<module>.c            one per module; test_web.c runs moas-web-client end to end
 ├── fuzz/
 │   ├── fuzz.h                     the entry point every target defines
 │   ├── fuzz_frame.c  fuzz_message.c  fuzz_n1mm_xml.c  fuzz_rigctld_reply.c
-│   │   fuzz_http_parse.c  fuzz_settings.c
+│   │   fuzz_n3fjp_reply.c  fuzz_http_parse.c  fuzz_settings.c
 │   ├── replay_main.c              runs stored inputs as tests where libFuzzer is unavailable
 │   └── corpus/<target>/
 ├── third_party/cjson/, third_party/picohttpparser/   each with its LICENSE; versions,
@@ -151,7 +153,8 @@ parser can be fuzzed alone and the risky code is easy to find.
 The web routes, which `page.html` uses: `GET /`, `GET /events`,
 `GET /api/state`, `POST /api/frequency`, `POST /api/select`,
 `POST /api/function`, and, local only, `GET` and `POST /api/settings`,
-`GET /api/n1mm-heard` and `POST /api/rigctld-test`.
+`GET /api/n1mm-heard`, `POST /api/rigctld-test` and
+`POST /api/n3fjp-test`.
 
 ## Rules that apply everywhere
 
@@ -427,7 +430,7 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
   on a port other than 12059, so that a real server on this computer is
   never reached by mistake.
 
-## Stage 6: DXLog, every configuration, trial, packaging, 1.0
+## Stage 6: DXLog, every configuration, N3FJP, trial, packaging, 1.0
 
 * DXLog as a frequency source.  DXLog.net, like N1MM Logger+, reports each
   radio's frequency over UDP.  First find out exactly what it sends, from
@@ -514,9 +517,40 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
     "not reported" until something is keyed.)
   * A `ShowTXRX` setting, on unless turned off: off, the client does not
     ask the server for transmit/receive state at all, and shows none.
+* N3FJP as a frequency source, for Amateur Contact Log and the other N3FJP
+  programs, through their TCP API.
+  * As built: an `n3fjp` type of its own, with rigctld's shape: it
+    connects, sends `<CMD><READBMF></CMD>` every `PollMilliseconds`, and
+    has the same reply, connect and retry times, settings checks and page
+    Test.  Changes normally arrive unasked, as soon as N3FJP sees them; the
+    poll (default 2000, at least 1000) checks that N3FJP still answers and
+    catches a change that was missed.  A capture polling every 250 ms
+    found every change first in a message N3FJP sent unasked, and ACLog
+    updating its frequency only every 4 seconds while tuning, so faster
+    polling would find nothing new; it would also cost the other programs,
+    since N3FJP repeats every reply to every program connected to it.  A
+    reading is renewed only by the poll between changes, so
+    `TimeoutSeconds` defaults to, and must be at least, the poll plus 3
+    seconds (5 by default); it follows a changed poll unless set, and is
+    saved only if set.  Only `FREQ` is read (MHz, to
+    1 Hz, turned into whole kHz); band and mode are not used, since ACLog
+    sends the old band with the new frequency for up to 2 seconds after a
+    band change.  A reading sent without being asked (a change, or a
+    copy of a reply to another program) counts like a reply; other
+    commands and blank lines are ignored, and a line too long to keep
+    is dropped rather than failing the source.  An empty or zero
+    frequency fails the source with "no usable frequency".
+  * Found from traffic captured with Amateur Contact Log: lines end with
+    CR+LF and may come several at once; changes are sent unasked, on a
+    2-second timer that alternates, it seems, between reading the rig's
+    frequency and its mode; more than one program may connect; on exit it
+    sends two blank lines and closes.  The captures are the fuzz corpus.
+  * The page offers "+ N3FJP"; `POST /api/n3fjp-test` reads once.
+  * N3FJP reports the frequency of the rig in use, so a source follows
+    whichever rig that is.  Not yet tried: a rig swap (Ctrl+X).
 * Try every feature from a checklist against a `--sim` server and the real
-  switch, DXLog included, with configurations that use additive systems,
-  on/off functions and relative antennas.
+  switch, DXLog and N3FJP included, with configurations that use additive
+  systems, on/off functions and relative antennas.
 * CPack packages (`.zip` for Windows, `.tar.gz` elsewhere), with checksums.
 * Build and test on macOS, and with MSVC, before 1.0.
 * User guide, `docs/architecture.md` and protocol notes.

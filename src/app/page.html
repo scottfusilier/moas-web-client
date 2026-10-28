@@ -503,9 +503,16 @@ function render() {
 // file, and each input's data-field is the path moas-web-client uses to point at a
 // problem, such as "Radios.0.Sources.1.Address".
 
-const DEFAULT_ADDRESS = { n1mm: "127.0.0.1:12060", dxlog: "127.0.0.1:12060", rigctld: "127.0.0.1:4532" };
+const DEFAULT_ADDRESS = { n1mm: "127.0.0.1:12060", dxlog: "127.0.0.1:12060", rigctld: "127.0.0.1:4532", n3fjp: "127.0.0.1:1100" };
 // The loggers that broadcast RadioInfo packets, by source type.
 const LOGGERS = { n1mm: "N1MM", dxlog: "DXLog" };
+// The programs that are polled for the frequency, by source type: as shown,
+// the default and least poll, the default timeout, and the route that tests
+// one.  N3FJP's timeout follows its poll; 5 is the default poll's.
+const POLLED = {
+  rigctld: { program: "rigctld", poll: "250", minPoll: "50", timeout: "2", test: "/api/rigctld-test" },
+  n3fjp: { program: "N3FJP", poll: "2000", minPoll: "1000", timeout: "5", test: "/api/n3fjp-test" },
+};
 let settingsAllowed = false;
 let cfg = null;        // while open: { view, draft, advanced, dirty, heard, tests }
 let heardTimer = 0;
@@ -641,7 +648,7 @@ function change(edit) {
 function newSource(type, radioNumber) {
   return LOGGERS[type]
     ? { Type: type, Address: DEFAULT_ADDRESS[type], RadioNr: radioNumber }
-    : { Type: "rigctld", Address: DEFAULT_ADDRESS.rigctld };
+    : { Type: type, Address: DEFAULT_ADDRESS[type] };
 }
 
 function renderSettings() {
@@ -769,6 +776,8 @@ function renderRadio(radio, i) {
     smallButton("+ N1MM", "Add an N1MM source", () => change(() => radio.Sources.push(newSource("n1mm", radio.Radio)))),
     smallButton("+ DXLog", "Add a DXLog source", () => change(() => radio.Sources.push(newSource("dxlog", radio.Radio)))),
     smallButton("+ rigctld", "Add a rigctld (hamlib) source", () => change(() => radio.Sources.push(newSource("rigctld")))),
+    smallButton("+ N3FJP", "Add an N3FJP source (Amateur Contact Log and the other N3FJP programs)",
+      () => change(() => radio.Sources.push(newSource("n3fjp")))),
   );
   box.append(add);
   return box;
@@ -779,7 +788,8 @@ function renderSource(radio, i, src, j) {
   const box = el("div", "s-src");
   const row = el("div", "row");
   const logger = LOGGERS[src.Type];
-  row.append(el("span", "kind", logger || src.Type));
+  const polled = POLLED[src.Type] || POLLED.rigctld;
+  row.append(el("span", "kind", logger || polled.program));
 
   if (logger) {
     row.append(
@@ -801,22 +811,23 @@ function renderSource(radio, i, src, j) {
         "Pass the caption of the F-key message N1MM is sending to the server, which shows it to other clients for this radio"));
     }
   } else {
-    row.append(input("rigctld at (host:port)", src, "Address", path + "Address", { className: "wide", placeholder: DEFAULT_ADDRESS.rigctld }));
+    const fallback = DEFAULT_ADDRESS[src.Type] || DEFAULT_ADDRESS.rigctld;
+    row.append(input(polled.program + " at (host:port)", src, "Address", path + "Address", { className: "wide", placeholder: fallback }));
     if (cfg.advanced) {
       row.append(
-        input("Timeout (s)", src, "TimeoutSeconds", path + "TimeoutSeconds", { type: "number", className: "num", step: "0.5", placeholder: "2", blankZero: true }),
-        input("Poll (ms)", src, "PollMilliseconds", path + "PollMilliseconds", { type: "number", className: "num", min: "50", placeholder: "250", blankZero: true }),
+        input("Timeout (s)", src, "TimeoutSeconds", path + "TimeoutSeconds", { type: "number", className: "num", step: "0.5", placeholder: polled.timeout, blankZero: true }),
+        input("Poll (ms)", src, "PollMilliseconds", path + "PollMilliseconds", { type: "number", className: "num", min: polled.minPoll, placeholder: polled.poll, blankZero: true }),
       );
     }
     const result = el("span", "test-result");
     const key = i + "/" + j;
     if (cfg.tests[key]) result.textContent = cfg.tests[key];
-    row.append(smallButton("Test", "Read the frequency from this rigctld once", async () => {
+    row.append(smallButton("Test", "Read the frequency from this " + polled.program + " once", async () => {
       result.textContent = "reading…";
       try {
-        const response = await fetch("/api/rigctld-test", {
+        const response = await fetch(polled.test, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: src.Address || DEFAULT_ADDRESS.rigctld }),
+          body: JSON.stringify({ address: src.Address || fallback }),
         });
         const body = await response.json();
         result.textContent = response.ok ? "✓ " + body.kHz + " kHz" : "✗ " + body.Message;

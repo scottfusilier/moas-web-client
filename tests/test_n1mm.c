@@ -245,7 +245,7 @@ test_settings(void)
                  ERR_INVALID);
     CHECK_MEM_EQ(err.message, strlen(err.message),
                  "Type \"flrig\" is not a known source; use \"n1mm\", "
-                 "\"dxlog\" or \"rigctld\"");
+                 "\"dxlog\", \"rigctld\" or \"n3fjp\"");
 }
 
 /* The antenna number and the F-key caption, when sent. */

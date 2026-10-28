@@ -22,6 +22,7 @@
  *   POST /api/settings         {settings, version}: save and apply
  *   GET  /api/n1mm-heard       the radios N1MM and DXLog have reported
  *   POST /api/rigctld-test     {address}: read a frequency once
+ *   POST /api/n3fjp-test       {address}: the same from an N3FJP program
  */
 
 #ifndef MOAS_APP_WEB_H

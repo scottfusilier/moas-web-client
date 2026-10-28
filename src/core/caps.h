@@ -90,6 +90,12 @@
 /* Longest reply line read from rigctld, in bytes. */
 #define CAPS_RIGCTLD_LINE 256
 
+/*
+ * Longest line read from an N3FJP program, in bytes; longer lines are
+ * dropped.
+ */
+#define CAPS_N3FJP_LINE 1024
+
 /* Browser connections served at once; more are closed at once. */
 #define CAPS_HTTP_CONNECTIONS 32
 

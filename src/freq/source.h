@@ -5,7 +5,7 @@
 
 /*
  * Frequency sources: programs that report a radio's frequency, such as
- * N1MM Logger+, DXLog.net or hamlib's rigctld.
+ * N1MM Logger+, DXLog.net, hamlib's rigctld or an N3FJP program.
  *
  * Each kind of source is a "type" with a table of operations
  * (struct freq_source_ops), listed in registry.c.  Adding a type means

@@ -3,9 +3,10 @@
 A cross-platform client for the MOAS II antenna switch server by M1DST and
 K1XM.  It connects to a MOAS server over the network and shows each radio's
 antenna buttons in a web page.  Each radio's frequency comes from N1MM
-Logger+, DXLog.net, hamlib's rigctld, or is typed on the page.  It is meant
-to run on Windows, Linux, FreeBSD and macOS; for now it is built and tested
-on Windows, FreeBSD and Linux.
+Logger+, DXLog.net, hamlib's rigctld, an N3FJP program such as Amateur
+Contact Log, or is typed on the page.  It is meant to run on Windows,
+Linux, FreeBSD and macOS; for now it is built and tested on Windows,
+FreeBSD and Linux.
 
 moas-web-client is an independent project and is not affiliated with or
 endorsed by the authors of MOAS.
@@ -30,8 +31,8 @@ there is one there, otherwise in your settings folder
 FreeBSD and Linux).  Edit them on the page's settings section, or by hand;
 [moas-web-client.example.json](moas-web-client.example.json) shows every
 setting, including where each radio's frequency comes from (N1MM Logger+,
-DXLog.net or rigctld).  Command-line options are optional and win over the
-file, for example `moas-web-client -server 192.168.1.10:12059`;
+DXLog.net, rigctld or N3FJP).  Command-line options are optional and win
+over the file, for example `moas-web-client -server 192.168.1.10:12059`;
 `moas-web-client -help` lists them.
 
 For DXLog.net, turn on Options → Broadcast → Radio information, and use a
@@ -40,6 +41,16 @@ N1MM and DXLog can both send to the same address: each source follows
 only its own logger's packets.  DXLog does not say when a radio is not
 connected, so a radio that is set up in DXLog but switched off keeps the
 frequency DXLog last showed for it.
+
+For Amateur Contact Log or another N3FJP program, turn on Settings →
+Application Program Interface → TCP API Enabled, and use an `n3fjp`
+source; it connects where N3FJP listens by default, 127.0.0.1:1100, and
+the settings section's Test button reads the frequency once.  Other
+programs can use N3FJP's API at the same time.  N3FJP reports the
+frequency of the rig in use, and sends it as soon as it sees a change;
+how quickly that is depends on N3FJP's own rig interface (every 2 to 4
+seconds with Amateur Contact Log), so the frequency follows the radio
+less closely than with rigctld.
 
 Two settings of an N1MM or DXLog source are off unless turned on, on the
 settings section or in the file: `FollowAntenna` steps to the next antenna
@@ -72,6 +83,13 @@ switch that reports transmit and receive changes that.  Add
 server's configuration and restart the server.  To show no
 transmit/receive state at all, turn off "Show transmit/receive state" in
 the advanced settings (`"ShowTXRX" : false`).
+
+**An N3FJP source shows "connection refused" or "timed out
+connecting".**  The N3FJP program is not running, or its TCP API is not
+turned on (Settings → Application Program Interface), or it listens on
+another port than the source's address.  "No usable frequency" means
+N3FJP has no frequency to show: enter one in its frequency field, or set
+up its rig interface.
 
 **The page says the MOAS server refused this client.**  The server allows
 only one client and another is connected; moas-web-client asks again every

@@ -64,7 +64,8 @@ test_full_file_and_comments(void)
         "    \"Sources\": [ { \"_comment\": \"N1MM here\", \"Type\": \"n1mm\","
         " \"RadioNr\": 1 },\n"
         "                  { \"Type\": \"rigctld\", \"Address\": "
-        "\"127.0.0.1:4533\" } ] },\n"
+        "\"127.0.0.1:4533\" },\n"
+        "                  { \"Type\": \"n3fjp\" } ] },\n"
         "    { \"Radio\": 3 } ],\n"
         "  \"RecentServers\": [\"192.168.1.10:12059\", \"10.0.0.2:12059\"] }";
     CHECK_INT_EQ(app_settings_parse(str_make(text, sizeof(text) - 1), &s,
@@ -74,9 +75,10 @@ test_full_file_and_comments(void)
     CHECK_TEXT(s.server, "192.168.1.10:12059"); /* trimmed */
     CHECK_INT_EQ(s.station, 2);
     CHECK_INT_EQ(s.radio_count, 2);
-    CHECK_INT_EQ(s.radios[0].source_count, 2);
+    CHECK_INT_EQ(s.radios[0].source_count, 3);
     CHECK_TEXT(s.radios[0].sources[0].name, "N1MM radio 1");
     CHECK_TEXT(s.radios[0].sources[1].name, "rigctld 127.0.0.1:4533");
+    CHECK_TEXT(s.radios[0].sources[2].name, "N3FJP 127.0.0.1:1100");
     CHECK_INT_EQ(s.radios[1].radio, 3);
     CHECK_INT_EQ(s.recent_count, 2);
 
@@ -93,6 +95,8 @@ test_full_file_and_comments(void)
         CHECK(strstr(out, "{\"Type\":\"rigctld\",\"Address\":\"127.0.0.1:"
                           "4533\",\"TimeoutSeconds\":2,\"PollMilliseconds\":"
                           "250}") != NULL);
+        CHECK(strstr(out, "{\"Type\":\"n3fjp\",\"Address\":\"127.0.0.1:1100\","
+                          "\"PollMilliseconds\":2000}") != NULL);
         cJSON_free(out);
     }
 
@@ -192,7 +196,7 @@ test_problems(void)
                   "{\"Type\":\"flrig\"}]}]}",
                   "Radios.0.Sources.1.Type",
                   "radio 2, source 2: Type \"flrig\" is not a known source; "
-                  "use \"n1mm\", \"dxlog\" or \"rigctld\"");
+                  "use \"n1mm\", \"dxlog\", \"rigctld\" or \"n3fjp\"");
 }
 
 /* The example shipped with moas-web-client is a good file. */
@@ -207,6 +211,8 @@ test_example_file(void)
     CHECK_INT_EQ(app_settings_load(EXAMPLE_SETTINGS, &s, &info, &err), 0);
     CHECK(info.had_comments && info.has_radios);
     CHECK_INT_EQ(s.radio_count, 2);
+    CHECK_INT_EQ(s.radios[0].source_count, 3);
+    CHECK_TEXT(s.radios[0].sources[2].name, "N3FJP 127.0.0.1:1100");
     const struct app_radio_settings *r = &s.radios[1];
     CHECK_INT_EQ(r->radio, 2);
     CHECK_INT_EQ(r->source_count, 2);
@@ -225,6 +231,8 @@ test_source_problems(void)
         "{\"Type\":\"rigctld\",\"TimeoutSeconds\":-1}",
         "{\"Type\":\"rigctld\",\"RadioNr\":2}",
         "{\"Type\":\"n1mm\",\"Address\":\"12060\"}",
+        "{\"Type\":\"n3fjp\",\"PollMilliseconds\":10}",
+        "{\"Type\":\"n3fjp\",\"FollowAntenna\":true}",
     };
     for (size_t i = 0; i < ARRAY_LEN(bad); i++) {
         char text[256];
