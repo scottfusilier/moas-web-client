@@ -540,6 +540,7 @@ test_page_drives_server(void)
                  204);
     EXPECT_RADIO(7000);
     WAIT_FOR(three_buttons);
+    WAIT_FOR(receiving);
 
     snap = snapshot();
     const cJSON *radio = radio_of(snap);
@@ -570,7 +571,6 @@ test_page_drives_server(void)
     CHECK_MEM_EQ(text(radio, "origin"), strlen(text(radio, "origin")),
                  "manual");
     cJSON_Delete(snap);
-    WAIT_FOR(receiving);
 
     /* A receive-only selection gives a split. */
     CHECK_INT_EQ(post("/api/select", "{\"station\":1,\"radio\":1,"

@@ -15,9 +15,9 @@ both called `moas-web-client`.
   closer to complete, it is built and tested on Windows, FreeBSD and Linux;
   macOS and MSVC come later.  Ninja is the build tool on every system, so
   the presets and check script are the same everywhere.
-* Kept in a private GitHub repository, with no hosted services in use.
-  Checks run from a script (`scripts/check.sh`, `scripts\check.bat`) on the
-  maintainer's machines, not in hosted CI.
+* No hosted services in use.  Checks run from a script
+  (`scripts/check.sh`, `scripts\check.bat`) on the maintainer's machines,
+  not in hosted CI.
 * Licensed BSD-2-Clause.
 * Code layout follows PEP 7: 4-space indents, no tabs, braces always,
   declarations where first used, return type on its own line, 79-column
@@ -564,16 +564,10 @@ server built on `oasp/`; small hardware.
 ## Testing machines
 
 This Windows PC (MSYS2 CLANG64 toolchain), the maintainer's FreeBSD
-machines, which also run fuzzing and the sanitizers, and a Linux virtual
-machine (Debian 13).
+machines, which also run fuzzing and the sanitizers, and a Linux machine
+(Ubuntu 24.04), the only one where LeakSanitizer runs.
 
-**Deferred:** Stages 0 to 5 passed the check on Windows and FreeBSD, with
-clang and gcc, and fuzzing on FreeBSD, but have not yet been checked on
-Linux (maintainer's decisions, 2026-10-24 and 2026-10-25, to keep going
-while the Debian VM is set up).  gcc builds on Windows (part of
-`check.bat`) and on FreeBSD cover gcc's warnings in the meantime.  What
-only Linux checks is memory leaks: LeakSanitizer runs by default only
-there.  Run `scripts/check.sh` on Linux before Stage 6 starts, and fix
-anything it finds then.
-
-The repository is private on GitHub.
+Linux was first checked on 2026-10-29, after Stage 5 and part of Stage 6:
+`scripts/check.sh` with gcc and with clang, and `scripts/fuzz.sh`, all
+pass, with no leaks.  That run found a race in a test (`test_web` read the
+page's state before the server's selection had arrived), now fixed.
