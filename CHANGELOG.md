@@ -86,6 +86,8 @@ numbers follow [Semantic Versioning](https://semver.org/).
   it, with a Test button.
 * Packages: `cmake --build --preset release --target package` makes a
   `.zip` on Windows or a `.tar.gz` elsewhere, with a SHA-256 checksum.
+* `docs/user-guide.md`, included in the packages, and
+  `docs/architecture.md`.
 
 ### Fixed
 

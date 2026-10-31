@@ -75,7 +75,7 @@ moas-web-client/
 ├── LICENSE, README.md, CHANGELOG.md, CONTRIBUTING.md
 ├── moas-web-client.example.json   an example settings file with every setting
 ├── .editorconfig, .clang-format, .gitattributes, .gitignore
-├── cmake/   platform  warnings  hardening  sanitizers  strip  format  check_banned  embed (.cmake)
+├── cmake/   platform  warnings  hardening  sanitizers  strip  format  check_banned  embed  package (.cmake)
 ├── scripts/ check.sh, check.bat   build and test every preset, check formatting
 │            fuzz.sh               build with libFuzzer and fuzz each target (Unix)
 ├── src/
@@ -144,7 +144,7 @@ moas-web-client/
 │   └── corpus/<target>/
 ├── third_party/cjson/, third_party/picohttpparser/   each with its LICENSE; versions,
 │                                  hashes and reasons in third_party/README.md
-└── docs/    ROADMAP.md  architecture.md  protocol.md  adding-a-frequency-source.md
+└── docs/    ROADMAP.md  user-guide.md  architecture.md  adding-a-frequency-source.md
 ```
 
 Parsing of outside input is always in its own file with no I/O, so that each
@@ -152,7 +152,8 @@ parser can be fuzzed alone and the risky code is easy to find.
 
 The web routes, which `page.html` uses: `GET /`, `GET /events`,
 `GET /api/state`, `POST /api/frequency`, `POST /api/select`,
-`POST /api/function`, and, local only, `GET` and `POST /api/settings`,
+`POST /api/function`, `POST /api/step`, `POST /api/rx-same-as-tx`, and,
+local only, `GET` and `POST /api/settings`,
 `GET /api/n1mm-heard`, `POST /api/rigctld-test` and
 `POST /api/n3fjp-test`.
 
@@ -560,7 +561,8 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
 * CPack packages (`.zip` for Windows, `.tar.gz` elsewhere), with checksums.
   As built: `cmake/package.cmake`, the `package` target of the `release`
   preset; each is built on the system it is for.
-* User guide, `docs/architecture.md` and protocol notes.
+* `docs/user-guide.md` and `docs/architecture.md`.  Separate protocol notes
+  were dropped; only contributors would read them.
 * Release v1.0.0.
 
 ## Later

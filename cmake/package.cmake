@@ -10,6 +10,7 @@ install(FILES
     LICENSE
     moas-web-client.example.json
     DESTINATION .)
+install(FILES docs/user-guide.md DESTINATION docs)
 install(FILES third_party/README.md DESTINATION third_party)
 install(FILES third_party/cjson/LICENSE
     DESTINATION third_party RENAME LICENSE.cJSON)
