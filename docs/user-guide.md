@@ -15,8 +15,8 @@ you can compare with the result of:
 | System  | Command |
 |---------|---------|
 | Windows | `certutil -hashfile moas-web-client-VERSION-windows-amd64.zip SHA256` |
-| Linux   | `sha256sum moas-web-client-VERSION-linux-x86_64.tar.gz` |
-| FreeBSD | `sha256 moas-web-client-VERSION-freebsd-amd64.tar.gz` |
+| Linux   | `sha256sum moas-web-client-*.tar.gz` |
+| FreeBSD | `sha256 moas-web-client-*.tar.gz` |
 
 The program is not signed, so Windows may warn about it the first time it
 runs.

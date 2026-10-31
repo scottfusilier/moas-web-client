@@ -13,8 +13,8 @@ endorsed by the authors of MOAS.
 
 ## Status
 
-Under development, not yet released; the plan and its progress are in
-[docs/ROADMAP.md](docs/ROADMAP.md).
+Version 1.0.0.  [CHANGELOG.md](CHANGELOG.md) lists what is in it, and
+[docs/ROADMAP.md](docs/ROADMAP.md) has what is planned next.
 
 ## Using it
 

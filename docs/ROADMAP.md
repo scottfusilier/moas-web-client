@@ -563,7 +563,7 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
   preset; each is built on the system it is for.
 * `docs/user-guide.md` and `docs/architecture.md`.  Separate protocol notes
   were dropped; only contributors would read them.
-* Release v1.0.0.
+* Released as v1.0.0 on 2026-10-31.
 
 ## Later
 
