@@ -46,7 +46,7 @@ struct fixture {
     bool keyed;
     /*
      * With full, the fake's configuration also has an additive antenna
-     * (60, "Bev-Combo") and an on/off, alternate function (1, "Inhibit"),
+     * (60, "Bev-Combo") and an on/off function (1, "Inhibit"),
      * whose states it keeps.
      */
     bool full;
@@ -204,11 +204,7 @@ on_fake_message(struct fake_server *server, const cJSON *msg, void *arg)
         send_tr(station, radio, fx.stuck ? 1 : 2);
     } else if (strcmp(name, "Function") == 0) {
         if (number(params, "Function") == 1) {
-            /* Inhibit: on, off, or toggled. */
-            int state = number(params, "State");
-            fx.inhibit_on = state == 1   ? true
-                            : state == 2 ? false
-                                         : !fx.inhibit_on;
+            fx.inhibit_on = number(params, "State") == 1;
             send_state(station, radio, 12, 12);
             return;
         }
@@ -554,7 +550,7 @@ test_page_drives_server(void)
         "\"state\":0,\"additive\":false}",
         "{\"row\":5,\"column\":0,\"kind\":\"function\",\"id\":0,\"name\":"
         "\"Swap\",\"longName\":\"Swap antennas\",\"tx\":0,\"rx\":0,"
-        "\"state\":0,\"momentary\":true,\"alternate\":false}",
+        "\"state\":0,\"momentary\":true}",
     };
     for (int i = 0; i < 3; i++) {
         char *got = cJSON_PrintUnformatted(cJSON_GetArrayItem(buttons, i));
@@ -1319,26 +1315,18 @@ test_every_kind_of_button(void)
     EXPECT_ANTENNA("TX:4/60,RX:4/60");
     WAIT_FOR(combo_available);
 
-    /* An on/off function: on, then off; then toggled as an alternate. */
+    /* An on/off function: on, then off. */
     CHECK_INT_EQ(post("/api/function", fn_inhibit), 204);
     EXPECT_FUNCTION(1, 1);
     WAIT_FOR(inhibit_on);
     CHECK_INT_EQ(post("/api/function", fn_inhibit), 204);
     EXPECT_FUNCTION(1, 2);
     WAIT_FOR(inhibit_off);
-    CHECK_INT_EQ(post("/api/function", "{\"station\":1,\"radio\":1,"
-                                       "\"function\":1,\"alternate\":true}"),
-                 204);
-    EXPECT_FUNCTION(1, 3);
-    WAIT_FOR(inhibit_on);
-    /* A momentary function always says select, and has no alternate. */
+    /* A momentary function always says select. */
     CHECK_INT_EQ(post("/api/function", "{\"station\":1,\"radio\":1,"
                                        "\"function\":0}"),
                  204);
     EXPECT_FUNCTION(0, 1);
-    CHECK_INT_EQ(post("/api/function", "{\"station\":1,\"radio\":1,"
-                                       "\"function\":0,\"alternate\":true}"),
-                 400);
 
     /* The relative antenna list, both ways. */
     CHECK_INT_EQ(post("/api/step", "{\"station\":1,\"radio\":1,"

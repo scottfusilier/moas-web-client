@@ -439,8 +439,7 @@ app_link_select(struct app_link *l, struct oasp_radio_id id, int antenna,
 }
 
 int
-app_link_function(struct app_link *l, struct oasp_radio_id id, int function,
-                  bool alternate)
+app_link_function(struct app_link *l, struct oasp_radio_id id, int function)
 {
     struct radio *r = find_radio(l, id.station, id.radio);
     if (r == NULL) {
@@ -451,17 +450,10 @@ app_link_function(struct app_link *l, struct oasp_radio_id id, int function,
     }
     int change = OASP_FUNCTION_SELECT;
     const struct oasp_function_button *f = function_button(r, function);
-    if (f != NULL && !f->momentary) {
-        if (alternate) {
-            if (!f->alternate) {
-                return ERR_INVALID;
-            }
-            change = OASP_FUNCTION_ALTERNATE;
-        } else if (function_state(r, function) == OASP_SELECTED) {
-            change = OASP_FUNCTION_DESELECT; /* it is on: turn it off */
-        }
-    } else if (alternate) {
-        return ERR_INVALID;
+    if (f != NULL && !f->momentary &&
+        function_state(r, function) == OASP_SELECTED)
+    {
+        change = OASP_FUNCTION_DESELECT; /* it is on: turn it off */
     }
     return oasp_client_send_function(l->client, id, function, change);
 }
@@ -660,8 +652,7 @@ add_buttons(cJSON *radio, const struct radio *r)
             !add_text(b, "longName", f->long_name) || !add_int(b, "tx", 0) ||
             !add_int(b, "rx", 0) ||
             !add_int(b, "state", function_state(r, f->function)) ||
-            cJSON_AddBoolToObject(b, "momentary", f->momentary) == NULL ||
-            cJSON_AddBoolToObject(b, "alternate", f->alternate) == NULL)
+            cJSON_AddBoolToObject(b, "momentary", f->momentary) == NULL)
         {
             return false;
         }

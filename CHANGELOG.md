@@ -65,8 +65,7 @@ numbers follow [Semantic Versioning](https://semver.org/).
   with how long ago each was heard.
 * Antenna selection for every MOAS configuration: antennas in additive
   systems are added and taken away; on/off functions are turned off as well
-  as on, and alternate functions toggled with a double-click; next and
-  previous antenna in the band's relative list, and RX = TX, as buttons on
+  as on; next and previous antenna in the band's relative list, and RX = TX, as buttons on
   the page.
 * What the server tells the user: a refusal (such as "Another client is
   already connected") is shown, and the server is asked again only after a

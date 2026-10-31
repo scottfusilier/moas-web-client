@@ -326,7 +326,7 @@ on_function(struct http_reply *reply, const struct http_request *req,
             void *arg)
 {
     static const char *const allowed[] = {"station", "radio", "function",
-                                          "alternate", NULL};
+                                          NULL};
     struct app_web *w = arg;
     cJSON *json = read_body(reply, req, allowed);
     if (json == NULL) {
@@ -334,15 +334,12 @@ on_function(struct http_reply *reply, const struct http_request *req,
     }
     struct oasp_radio_id id;
     int function = 0;
-    bool alternate = false;
     if (get_radio(reply, w, json, &id)) {
-        if (!get_required(json, "function", &function) ||
-            json_get_bool(json, "alternate", &alternate) != 0)
-        {
+        if (!get_required(json, "function", &function)) {
             http_reply_error(reply, 400, "function is required");
         } else {
             reply_sent(reply, app_link_function(app_runner_link(w->runner), id,
-                                                function, alternate));
+                                                function));
         }
     }
     cJSON_Delete(json);

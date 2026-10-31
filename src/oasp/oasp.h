@@ -115,8 +115,7 @@ struct oasp_antenna_button {
  * A function, or a relay group shown as one.  A momentary function acts
  * once each time it is selected.  Any other is on or off, as its state in
  * State says (OASP_SELECTED is on): it is turned on with
- * OASP_FUNCTION_SELECT and off with OASP_FUNCTION_DESELECT.  An alternate
- * one may instead be toggled with OASP_FUNCTION_ALTERNATE.
+ * OASP_FUNCTION_SELECT and off with OASP_FUNCTION_DESELECT.
  */
 struct oasp_function_button {
     int function; /* the function's ID */

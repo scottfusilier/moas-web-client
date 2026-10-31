@@ -363,10 +363,6 @@ function makeCell(panel, button, enabled) {
     if (!button.momentary) cell.setAttribute("aria-pressed", String(on));
     cell.disabled = !enabled || button.state === 0;
     cell.addEventListener("click", () => post("/api/function", { ...panel.id, function: button.id }));
-    if (button.alternate) {
-      cell.title += " (double-click for its alternate action)";
-      cell.addEventListener("dblclick", () => post("/api/function", { ...panel.id, function: button.id, alternate: true }));
-    }
     return cell;
   }
   if (button.additive) cell.title += " (adds to what is selected; click again to take it away)";

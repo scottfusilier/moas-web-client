@@ -12,7 +12,7 @@
  *   GET  /api/state            a snapshot
  *   POST /api/frequency        {station, radio, frequency}
  *   POST /api/select           {station, radio, antenna, tx, rx}
- *   POST /api/function         {station, radio, function, alternate?}
+ *   POST /api/function         {station, radio, function}
  *   POST /api/step             {station, radio, direction}: next/previous
  *   POST /api/rx-same-as-tx    {station, radio}
  *

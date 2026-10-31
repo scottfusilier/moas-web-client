@@ -462,8 +462,7 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
     one client refuses another; then say so, and retry only slowly
     rather than reconnecting every few seconds.
   * On/off functions: a function that is not momentary is turned off by
-    sending "deselect" when it is on, and one marked `Alternate` is
-    toggled with "alternate".  Today every press sends "select", which is
+    sending "deselect" when it is on.  Today every press sends "select", which is
     right only for momentary functions.
   * Additive antenna systems: antennas marked `Additive` in a
     Configuration are added to and removed from the selection ("additive
@@ -485,7 +484,7 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
     available and taken away when selected (receive following transmit
     where it can); any other antenna replaces the selection in its
     system; a function that is not momentary is turned off when it is on
-    (state 2), and one marked Alternate is toggled with a double-click.
+    (state 2).
     The page lights a function when it is on and disables it when the
     server says unavailable (state 0); before, it lit them when merely
     available.  Prev / Next and RX = TX are buttons on each radio; RX =

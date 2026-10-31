@@ -69,11 +69,10 @@ int app_link_select(struct app_link *link, struct oasp_radio_id id,
 
 /*
  * A click on a function: a momentary one acts once; any other is turned
- * off if it is on, and on otherwise.  With alternate, toggles a function
- * the server marks Alternate (ERR_INVALID for any other).
+ * off if it is on, and on otherwise.
  */
 int app_link_function(struct app_link *link, struct oasp_radio_id id,
-                      int function, bool alternate);
+                      int function);
 
 /* The next (or previous) antenna in the band's relative antenna list. */
 int app_link_step(struct app_link *link, struct oasp_radio_id id, bool next);
