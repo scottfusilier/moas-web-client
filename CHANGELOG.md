@@ -84,6 +84,8 @@ numbers follow [Semantic Versioning](https://semver.org/).
   sends by itself, polls every 2 seconds by default to check that N3FJP
   still answers, and uses only the frequency.  The settings page offers
   it, with a Test button.
+* Packages: `cmake --build --preset release --target package` makes a
+  `.zip` on Windows or a `.tar.gz` elsewhere, with a SHA-256 checksum.
 
 ### Fixed
 

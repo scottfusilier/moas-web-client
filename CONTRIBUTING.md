@@ -136,6 +136,18 @@ To try gcc on FreeBSD, `pkg install gcc14` and run the check with
 FreeBSD with address randomisation on; run the `asan` tests with
 `proccontrol -m aslr -s disable ctest --preset asan`.
 
+### Packaging
+
+```
+cmake --preset release
+cmake --build --preset release --target package
+```
+
+This makes `build/release/moas-web-client-<version>-<system>-<processor>`,
+`.zip` on Windows and `.tar.gz` elsewhere, with a `.sha256` file beside it.
+Build each package on the system it is for.  A Linux package needs a C
+library at least as new as the one it was built with.
+
 ### Fuzzing
 
 Every parser of outside input has a fuzz target in `fuzz/`.  On FreeBSD and

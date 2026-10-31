@@ -242,7 +242,7 @@ sockets and timers.
 The platform layer is where macOS problems would show up, so it follows the
 macOS rule under "Rules that apply everywhere".  If a Mac is available when
 this stage is done, one run of `scripts/check.sh` on it is worth doing;
-otherwise macOS is tested before 1.0, and any fixes stay in `platform/`.
+otherwise macOS is tested after 1.0, and any fixes stay in `platform/`.
 
 As built, Stage 1 differs from the plan in a few ways:
 
@@ -547,17 +547,25 @@ As built, Stage 5 differs from the plan, or adds to it, in these ways:
   * The page offers "+ N3FJP"; `POST /api/n3fjp-test` reads once.
   * N3FJP reports the frequency of the rig in use, so a source follows
     whichever rig that is.  Not yet tried: a rig swap (Ctrl+X).
-* Try every feature from a checklist against a `--sim` server and the real
-  switch, DXLog and N3FJP included, with configurations that use additive
-  systems, on/off functions and relative antennas.
+* Tried by hand instead of a formal checklist: everyday use by the
+  maintainer, TX/RX on a real switch, and additive antennas and on/off
+  functions against a `--sim` server using the sample Tribander Stack
+  configuration.  Covered only by the automated tests at 1.0: a refusal
+  (`OneClient`), rigctld, N1MM's `FollowAntenna` and F-key text, and an
+  N3FJP rig swap.
+* The double-click on a function was removed.  A server marks on/off
+  functions `Alternate`, but most ignore the "alternate" request and a
+  few act on it in ways that surprise; a click already turns them on and
+  off.
 * CPack packages (`.zip` for Windows, `.tar.gz` elsewhere), with checksums.
-* Build and test on macOS, and with MSVC, before 1.0.
+  As built: `cmake/package.cmake`, the `package` target of the `release`
+  preset; each is built on the system it is for.
 * User guide, `docs/architecture.md` and protocol notes.
 * Release v1.0.0.
 
 ## Later
 
-Rotators; more frequency sources (flrig, OmniRig, a serial CAT port); a MOAS
+macOS and MSVC builds; rotators; more frequency sources (flrig, OmniRig, a serial CAT port); a MOAS
 server built on `oasp/`; small hardware.
 
 ## Testing machines

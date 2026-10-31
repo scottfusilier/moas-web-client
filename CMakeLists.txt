@@ -44,3 +44,5 @@ if(MOAS_BUILD_TESTS)
     add_subdirectory(tests)
     add_subdirectory(fuzz)
 endif()
+
+include(package)
